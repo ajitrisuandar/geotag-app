@@ -8,6 +8,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    .mirror-mode {
+      transform: scaleX(-1);
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 font-sans">
 
@@ -41,7 +46,7 @@
         </button>
 
         <!-- Live Watermark Overlay (Tampil langsung di atas video live) -->
-        <div class="absolute bottom-2 left-2 right-2 bg-black/75 backdrop-blur-sm p-3 rounded-xl border border-white/10 text-white pointer-events-none">
+        <div class="absolute bottom-2 left-2 right-2 bg-black/75 backdrop-blur-sm p-3 rounded-xl border border-white/10 text-white pointer-events-none z-10">
           <div class="text-amber-400 font-bold text-xs mb-0.5">📍 GPS MAP Camera Panca Pilat Tangguh</div>
           <div id="liveAddress" class="text-[11px] text-slate-200 truncate leading-tight mb-1">Memuat alamat lokasi...</div>
           <div id="liveLatLon" class="text-[11px] text-sky-400 font-mono">Lat: 0.00000, Lon: 0.00000</div>
@@ -49,7 +54,7 @@
         </div>
 
         <!-- Logo di Pojok Kiri Atas Live Video -->
-        <div class="absolute top-3 left-3 pointer-events-none">
+        <div class="absolute top-3 left-3 pointer-events-none z-10">
           <img id="liveLogoImg" src="" alt="" class="h-12 w-auto drop-shadow-md hidden">
         </div>
       </div>
@@ -265,6 +270,12 @@
         const videoElement = document.getElementById('videoElement');
         videoElement.srcObject = mediaStream;
         
+        if (currentFacingMode === 'user') {
+          videoElement.classList.add('mirror-mode');
+        } else {
+          videoElement.classList.remove('mirror-mode');
+        }
+        
         setInterval(updateLiveOverlayText, 1000);
       } catch (err) {
         console.error("Gagal membuka kamera:", err);
@@ -286,7 +297,7 @@
       startLiveCameraStream();
     }
 
-    // 5. Ambil Gambar dengan Perhitungan Crop (Object-Cover) Persis Seperti Tampilan Live
+    // 5. Ambil Gambar (Crop Object-Cover & Skala Watermark Proporsional Sesuai Live)
     function captureLivePhoto() {
       const videoElement = document.getElementById('videoElement');
       const canvas = document.getElementById('cameraCanvas');
@@ -297,7 +308,6 @@
       const cWidth = videoElement.clientWidth;
       const cHeight = videoElement.clientHeight;
 
-      // Hitung rasio untuk mencocokkan object-cover persis seperti kotak preview live
       const vRatio = vWidth / vHeight;
       const cRatio = cWidth / cHeight;
 
@@ -314,6 +324,7 @@
         sy = (vHeight - sHeight) / 2;
       }
 
+      // Gunakan resolusi target yang proporsional dengan lebar layar preview agar ukuran teks pas
       const targetWidth = 1000;
       const targetHeight = Math.round(targetWidth / cRatio);
 
@@ -321,69 +332,75 @@
       canvas.height = targetHeight;
       const ctx = canvas.getContext('2d');
 
-      // Gambar potongan video yang sesuai dengan tampilan layar live (object-cover)
-      ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+      if (currentFacingMode === 'user') {
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, -targetWidth, 0, targetWidth, targetHeight);
+        ctx.restore();
+      } else {
+        ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+      }
 
-      const scale = targetWidth / 1000;
+      // ⚙️ Skala disesuaikan berdasarkan rasio tampilan live agar ukuran teks & box persis sama
+      const scale = targetWidth / 420;
 
       if (LOGO_BASE64) {
         const logoImg = new Image();
         logoImg.onload = () => {
-          const logoHeight = Math.round(110 * scale);
+          const logoHeight = Math.round(42 * scale);
           const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
-          ctx.drawImage(logoImg, Math.round(20 * scale), Math.round(20 * scale), logoWidth, logoHeight);
-          finalizeCanvasImage(canvas);
+          ctx.drawImage(logoImg, Math.round(15 * scale), Math.round(15 * scale), logoWidth, logoHeight);
+          finalizeCanvasImage(canvas, scale);
         };
         logoImg.src = LOGO_BASE64;
       } else {
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.fillRect(20 * scale, 20 * scale, 280 * scale, 50 * scale);
-        ctx.fillStyle = "#FFFFFF";
-        ctx.font = "bold " + Math.round(16 * scale) + "px sans-serif";
-        ctx.fillText("PT. PANCA PILAT TANGGUH", 35 * scale, 52 * scale);
-        finalizeCanvasImage(canvas);
+        finalizeCanvasImage(canvas, scale);
       }
     }
 
-    function finalizeCanvasImage(canvas) {
+    function finalizeCanvasImage(canvas, scale) {
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
-      const scale = width / 1000;
 
-      const boxHeight = Math.round(180 * scale);
-      const boxY = canvas.height - boxHeight - 20;
-      const boxX = 20 * scale;
-      const boxWidth = canvas.width - (40 * scale);
+      // Ukuran box & padding disesuaikan agar proporsional persis seperti live overlay
+      const boxHeight = Math.round(115 * scale);
+      const boxY = canvas.height - boxHeight - Math.round(10 * scale);
+      const boxX = Math.round(10 * scale);
+      const boxWidth = width - Math.round(20 * scale);
 
-      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16 * scale);
+        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(12 * scale));
         ctx.fill();
       } else {
         ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
       }
 
-      const contentX = boxX + (20 * scale); 
+      const contentX = boxX + Math.round(12 * scale); 
       
+      // Judul Watermark
       ctx.fillStyle = "#F59E0B";
-      ctx.font = "bold " + Math.round(15 * scale) + "px sans-serif";
-      ctx.fillText("GPS MAP Camera Panca Pilat Tangguh", contentX, boxY + (35 * scale));
+      ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
+      ctx.fillText("📍 GPS MAP Camera Panca Pilat Tangguh", contentX, boxY + Math.round(22 * scale));
 
+      // Alamat Lengkap
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = Math.round(12 * scale) + "px sans-serif";
-      wrapText(ctx, resolvedAddressText, contentX, boxY + (60 * scale), boxWidth - (40 * scale), Math.round(16 * scale));
+      ctx.font = Math.round(11 * scale) + "px sans-serif";
+      wrapText(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), boxWidth - Math.round(24 * scale), Math.round(14 * scale));
 
+      // Koordinat Lat & Long
       ctx.fillStyle = "#38BDF8";
-      ctx.font = "bold " + Math.round(13 * scale) + "px monospace";
-      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + (130 * scale));
+      ctx.font = "bold " + Math.round(11 * scale) + "px monospace";
+      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(78 * scale));
 
+      // Tanggal & Waktu WIB
       const now = getRealTime();
       const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
       
       ctx.fillStyle = "#CBD5E1";
-      ctx.font = Math.round(11 * scale) + "px sans-serif";
-      ctx.fillText(tanggalStr, contentX, boxY + (155 * scale));
+      ctx.font = Math.round(10 * scale) + "px sans-serif";
+      ctx.fillText(tanggalStr, contentX, boxY + Math.round(98 * scale));
 
       finalWatermarkedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
