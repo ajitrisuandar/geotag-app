@@ -29,7 +29,7 @@
     <div id="gpsVerificationBox" class="w-full text-center py-12">
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400 mx-auto mb-4"></div>
       <p id="txtUserGps" class="text-sm font-semibold text-slate-200">Memulai pemindaian GPS...</p>
-      <p class="text-xs text-slate-500 mt-2">Memverifikasi keaslian lokasi.</p>
+      <p class="text-xs text-slate-500 mt-2">Memverifikasi keaslian lokasi (2 Sampel Minimal).</p>
     </div>
 
     <!-- 2. Kotak Kamera Live & Watermark Overlay -->
@@ -59,7 +59,7 @@
 
         <!-- Logo di Pojok Kiri Atas Live Video -->
         <div class="absolute top-3 left-3 pointer-events-none z-10">
-          <img id="liveLogoImg" src="" alt="" class="h-12 w-auto drop-shadow-md hidden">
+          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-12 w-auto drop-shadow-md">
         </div>
       </div>
 
@@ -104,14 +104,14 @@
   <script>
     let currentUserGps = { lat: 0, lon: 0 };
     let resolvedAddressText = "Memuat alamat lokasi...";
-    let mapBase64Data = "";
+    let mapImageUrl = "";
     let finalWatermarkedDataUrl = "";
     let mediaStream = null;
     let serverTimeOffset = 0;
     let currentFacingMode = 'environment';
 
-    // 💡 Masukkan string Base64 logo PNG transparan Anda di sini (contoh: "data:image/png;base64,iVBORw0KGgo...")
-    const LOGO_BASE64 = ""; 
+    // Nama file logo langsung di folder repository
+    const LOGO_URL = "logo.png"; 
 
     document.addEventListener("DOMContentLoaded", async function() {
       await syncServerTime();
@@ -225,37 +225,22 @@
 
       currentUserGps = { lat: latestSample.lat, lon: latestSample.lon };
 
-      // Ambil Alamat & Peta Mini secara paralel
-      Promise.all([
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latestSample.lat}&lon=${latestSample.lon}`).then(res => res.json()).catch(() => null),
-        fetchStaticMapBase64(latestSample.lat, latestSample.lon)
-      ]).then(([addrData, mapBase64]) => {
-        resolvedAddressText = addrData && addrData.display_name ? addrData.display_name : `Lat: ${latestSample.lat.toFixed(5)}, Lon: ${latestSample.lon.toFixed(5)}`;
-        mapBase64Data = mapBase64 || "";
+      mapImageUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${latestSample.lat},${latestSample.lon}&zoom=15&size=180x180&markers=${latestSample.lat},${latestSample.lon},red-pushpin`;
 
-        updateLiveOverlayText();
-
-        document.getElementById('gpsVerificationBox').classList.add('hidden');
-        document.getElementById('liveCameraContainer').classList.remove('hidden');
-        startLiveCameraStream();
-      });
-    }
-
-    // Fungsi mengambil gambar peta statis OpenStreetMap tanpa kendala CORS
-    async function fetchStaticMapBase64(lat, lon) {
-      try {
-        const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=15&size=180x180&markers=${lat},${lon},red-pushpin`;
-        const response = await fetch(mapUrl);
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.readAsDataURL(blob);
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latestSample.lat}&lon=${latestSample.lon}`)
+        .then(res => res.json())
+        .then(data => {
+          resolvedAddressText = data && data.display_name ? data.display_name : `Lat: ${latestSample.lat.toFixed(5)}, Lon: ${latestSample.lon.toFixed(5)}`;
+          updateLiveOverlayText();
+        })
+        .catch(() => {
+          resolvedAddressText = `Lat: ${latestSample.lat.toFixed(5)}, Lon: ${latestSample.lon.toFixed(5)}`;
+          updateLiveOverlayText();
         });
-      } catch (e) {
-        console.warn("Gagal memuat peta statis:", e);
-        return "";
-      }
+
+      document.getElementById('gpsVerificationBox').classList.add('hidden');
+      document.getElementById('liveCameraContainer').classList.remove('hidden');
+      startLiveCameraStream();
     }
 
     function updateLiveOverlayText() {
@@ -266,16 +251,10 @@
       document.getElementById('liveLatLon').innerText = `Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`;
       document.getElementById('liveDateTime').innerText = tanggalStr;
 
-      if (mapBase64Data) {
+      if (mapImageUrl) {
         const mapEl = document.getElementById('liveMapImg');
-        mapEl.src = mapBase64Data;
+        mapEl.src = mapImageUrl;
         mapEl.classList.remove('hidden');
-      }
-
-      if (LOGO_BASE64) {
-        const logoEl = document.getElementById('liveLogoImg');
-        logoEl.src = LOGO_BASE64;
-        logoEl.classList.remove('hidden');
       }
     }
 
@@ -325,7 +304,7 @@
       startLiveCameraStream();
     }
 
-    // 5. Ambil Gambar (Crop Object-Cover, Peta Mini, Logo & Watermark Sesuai Live)
+    // 5. Ambil Gambar & Render Peta + Logo + Watermark ke Canvas
     function captureLivePhoto() {
       const videoElement = document.getElementById('videoElement');
       const canvas = document.getElementById('cameraCanvas');
@@ -370,22 +349,26 @@
 
       const scale = targetWidth / 420;
 
-      // Render Logo di Pojok Kiri Atas
-      if (LOGO_BASE64) {
+      // Render Logo dari file logo.png
+      if (LOGO_URL) {
         const logoImg = new Image();
+        logoImg.crossOrigin = "anonymous";
         logoImg.onload = () => {
           const logoHeight = Math.round(42 * scale);
           const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
           ctx.drawImage(logoImg, Math.round(15 * scale), Math.round(15 * scale), logoWidth, logoHeight);
-          renderWatermarkAndMap(canvas, scale);
+          loadMapAndRenderWatermark(canvas, scale);
         };
-        logoImg.src = LOGO_BASE64;
+        logoImg.onerror = () => {
+          loadMapAndRenderWatermark(canvas, scale);
+        };
+        logoImg.src = LOGO_URL;
       } else {
-        renderWatermarkAndMap(canvas, scale);
+        loadMapAndRenderWatermark(canvas, scale);
       }
     }
 
-    function renderWatermarkAndMap(canvas, scale) {
+    function loadMapAndRenderWatermark(canvas, scale) {
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
 
@@ -394,7 +377,7 @@
       const boxX = Math.round(10 * scale);
       const boxWidth = width - Math.round(20 * scale);
 
-      // Background Kotak Watermark Utama
+      // Background Kotak Watermark
       ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
@@ -404,9 +387,10 @@
         ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
       }
 
-      // Render Peta Mini di Sebelah Kiri Watermark
-      if (mapBase64Data) {
+      // Muat Gambar Peta Statis ke Canvas
+      if (mapImageUrl) {
         const mapImg = new Image();
+        mapImg.crossOrigin = "anonymous";
         mapImg.onload = () => {
           const mapSize = Math.round(95 * scale);
           const mapX = boxX + Math.round(10 * scale);
@@ -419,7 +403,6 @@
           ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
           ctx.restore();
 
-          // Border Putih Peta Mini
           ctx.strokeStyle = "#FFFFFF";
           ctx.lineWidth = 1.5;
           if (typeof ctx.roundRect === 'function') {
@@ -430,7 +413,10 @@
 
           drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, mapSize + Math.round(22 * scale));
         };
-        mapImg.src = mapBase64Data;
+        mapImg.onerror = () => {
+          drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, Math.round(15 * scale));
+        };
+        mapImg.src = mapImageUrl;
       } else {
         drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, Math.round(15 * scale));
       }
@@ -440,22 +426,18 @@
       const contentX = boxX + textOffsetX;
       const maxTextWidth = boxWidth - textOffsetX - Math.round(10 * scale);
       
-      // Judul Watermark
       ctx.fillStyle = "#F59E0B";
       ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
       ctx.fillText("📍 GPS MAP Camera Panca pilar Tangguh", contentX, boxY + Math.round(22 * scale));
 
-      // Alamat Lengkap
       ctx.fillStyle = "#FFFFFF";
       ctx.font = Math.round(11 * scale) + "px sans-serif";
       wrapText(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), maxTextWidth, Math.round(14 * scale));
 
-      // Koordinat Lat & Long
       ctx.fillStyle = "#38BDF8";
       ctx.font = "bold " + Math.round(11 * scale) + "px monospace";
       ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(78 * scale));
 
-      // Tanggal & Waktu WIB
       const now = getRealTime();
       const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
       
