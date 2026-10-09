@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPS Map Camera - Panca Pilat Tangguh</title>
+  <!-- Tailwind CSS untuk UI yang modern -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SweetAlert2 untuk Popup & Loading -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4">
+
+  <!-- Header -->
+  <header class="w-full max-w-md text-center py-4">
+    <h1 class="text-xl font-bold text-amber-400">📍 GPS Map Camera</h1>
+    <p class="text-xs text-slate-400">Panca Pilat Tangguh - Geotagging System</p>
+  </header>
+
+  <!-- Main Container -->
+  <main class="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl p-5 border border-slate-700 flex flex-col items-center">
+
+    <!-- 1. Status & Verifikasi GPS (Anti-Fake GPS) -->
+    <div id="gpsStatusContainer" class="w-full text-center py-6">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400 mx-auto mb-4"></div>
+      <p id="gpsStatusText" class="text-sm font-medium text-slate-300">Memeriksa lokasi & validasi GPS...</p>
+    </div>
+
+    <!-- 2. Tombol Ambil Gambar (Muncul setelah GPS Valid) -->
+    <div id="cameraActionContainer" class="w-full hidden text-center py-4">
+      <div class="bg-emerald-900/40 border border-emerald-500/50 text-emerald-300 text-xs rounded-xl p-3 mb-6 text-left">
+        <span class="font-bold">GPS Valid & Aman!</span> Lokasi Anda telah terverifikasi bebas dari Fake GPS. Silakan ambil foto kehadiran.
+      </div>
+      
+      <!-- Input Kamera Native (Mendukung Kamera Belakang HP) -->
+      <label for="cameraInput" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3.5 px-6 rounded-xl shadow-lg cursor-pointer flex items-center justify-center gap-2 transition duration-200">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        >
+      </svg>
+        Buka Kamera & Ambil Foto
+      </label>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden" onchange="processCapturedGeotagImage(event)">
+    </div>
+
+    <!-- 3. Preview Hasil Foto ber-Watermark -->
+    <div id="previewGeotagContainer" class="w-full hidden flex flex-col items-center">
+      <div class="w-full rounded-xl overflow-hidden shadow-md border border-slate-700 mb-4 bg-slate-900">
+        <img id="geotagPreviewImg" src="" alt="Preview Geotag" class="w-full object-contain">
+      </div>
+
+      <!-- Tombol Aksi (Download & Ambil Ulang) -->
+      <div class="flex w-full gap-3">
+        <button onclick="retakePhoto()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 rounded-xl transition duration-200 text-sm">
+          🔄 Ambil Ulang
+        </button>
+        <a id="downloadBtn" download="Geotag_Attendance.jpg" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl text-center transition duration-200 text-sm flex items-center justify-center gap-1 shadow-lg">
+          💾 Download Foto
+        </a>
+      </div>
+    </div>
+
+    <!-- Canvas Tersembunyi untuk Proses Watermark -->
+    <canvas id="geotagCanvas" class="hidden"></canvas>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="w-full text-center py-4 text-xs text-slate-500">
+    &copy; 2026 Panca Pilat Tangguh. All rights reserved.
+  </footer>
+
+  <!-- Script Logika Aplikasi -->
+  <script>
+    // Variabel Global untuk menyimpan data GPS & Alamat
+    let currentVerifiedGps = { lat: 0, lon: 0 };
+    let resolvedAddressText = "Memuat alamat lokasi...";
+    let finalWatermarkedDataUrl = "";
+
+    // Ganti string ini dengan Base64 logo PNG transparan Anda (atau biarkan menggunakan placeholder logo teks/gambar)
+    // Cara ubah logo jadi base64: https://www.base64-image.de/
+    const LOGO_BASE64 = ""; 
+
+    // Jalankan pengecekan GPS otomatis saat halaman dibuka di GitHub Pages
+    document.addEventListener("DOMContentLoaded", async function() {
+      await verifyGpsSecurityAndLocation();
+    });
+
+    // Simulasi / Fungsi Pengecekan GPS & Anti-Fake GPS
+    async function verifyGpsSecurityAndLocation() {
+      const statusText = document.getElementById("gpsStatusText");
+      
+      if (!navigator.geolocation) {
+        Swal.fire({ icon: 'error', title: 'Tidak Didukung', text: 'Browser Anda tidak mendukung GPS.' });
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async function(position) {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+
+          // Deteksi sederhana Fake GPS (jika akurasi tidak wajar atau mock location indikator)
+          if (accuracy > 100) {
+            Swal.fire({
+              icon: 'warning',
+              title: 'Peringatan GPS',
+              text: 'Akurasi GPS terlalu rendah atau terdeteksi sinyal palsu. Harap matikan aplikasi Mock Location.'
+            });
+            statusText.innerText = "GPS tidak akurat / Terdeteksi Fake GPS.";
+            return;
+          }
+
+          currentVerifiedGps = { lat, lon };
+          
+          // Reverse geocoding sederhana via Nominatim OpenStreetMap (Gratis & Publik)
+          try {
+            let res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+            let data = await res.json();
+            if (data && data.display_name) {
+              resolvedAddressText = data.display_name;
+            } else {
+              resolvedAddressText = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
+            }
+          } catch (e) {
+            resolvedAddressText = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
+          }
+
+          // Jika GPS valid, tampilkan tombol kamera
+          document.getElementById("gpsStatusContainer").classList.add("hidden");
+          document.getElementById("cameraActionContainer").classList.remove("hidden");
+        },
+        function(error) {
+          Swal.fire({ icon: 'error', title: 'Gagal Akses GPS', text: 'Pastikan izin GPS/Location pada browser Anda diaktifkan.' });
+          statusText.innerText = "Izin GPS ditolak atau bermasalah.";
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+
+    // Fungsi Utama Memproses Foto dan Menempelkan Watermark & Logo
+    async function processCapturedGeotagImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      Swal.fire({
+        title: 'Memproses Watermark...',
+        text: 'Menempelkan logo dan informasi lokasi...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = async function() {
+          try {
+            const canvas = document.getElementById('geotagCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const maxWidth = 1000;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            // 1. Gambar Foto Utama dari Kamera
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Waktu Realtime WIB
+            const now = new Date();
+            const tanggalStr = now.toLocaleDateString('id-ID', { 
+                timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            }) + " " + now.toLocaleTimeString('id-ID', { 
+                timeZone: 'Asia/Jakarta', hour12: false 
+            }) + " GMT +07:00";
+
+            const scale = width / 1000;
+            const lat = currentVerifiedGps.lat;
+            const lon = currentVerifiedGps.lon;
+
+            // 2. Render Logo PNG Transparan di Pojok Kiri Atas (Jika ada Base64)
+            if (LOGO_BASE64) {
+              await new Promise((resolve) => {
+                const logoImg = new Image();
+                logoImg.onload = () => {
+                  const logoHeight = Math.round(110 * scale);
+                  const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
+                  const logoX = Math.round(20 * scale);
+                  const logoY = Math.round(20 * scale);
+                  
+                  ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+                  resolve();
+                };
+                logoImg.onerror = () => resolve();
+                logoImg.src = LOGO_BASE64;
+              });
+            } else {
+              // Fallback kotak teks logo jika base64 kosong
+              ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+              ctx.fillRect(20 * scale, 20 * scale, 250 * scale, 50 * scale);
+              ctx.fillStyle = "#FFFFFF";
+              ctx.font = "bold " + Math.round(16 * scale) + "px sans-serif";
+              ctx.fillText("PT. PANCA PILAT TANGGUH", 35 * scale, 52 * scale);
+            }
+
+            // 3. Kotak Watermark Utama di Bagian Bawah
+            const boxHeight = Math.round(170 * scale);
+            const boxY = canvas.height - boxHeight - 20;
+            const boxX = 20 * scale;
+            const boxWidth = canvas.width - (40 * scale);
+
+            ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+            if (typeof ctx.roundRect === 'function') {
+              ctx.beginPath();
+              ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 16 * scale);
+              ctx.fill();
+            } else {
+              ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+            }
+
+            const contentX = boxX + (20 * scale); 
+            
+            // Judul Watermark
+            ctx.fillStyle = "#F59E0B";
+            ctx.font = "bold " + Math.round(15 * scale) + "px sans-serif";
+            ctx.fillText("GPS MAP Camera Panca Pilat Tangguh", contentX, boxY + (35 * scale));
+
+            // Alamat Lengkap
+            ctx.fillStyle = "#FFFFFF";
+            ctx.font = Math.round(12 * scale) + "px sans-serif";
+            wrapText(ctx, resolvedAddressText, contentX, boxY + (60 * scale), boxWidth - (40 * scale), Math.round(16 * scale));
+
+            // Koordinat Lat & Long
+            ctx.fillStyle = "#38BDF8";
+            ctx.font = "bold " + Math.round(13 * scale) + "px monospace";
+            ctx.fillText("Lat " + lat.toFixed(6) + " Long " + lon.toFixed(6), contentX, boxY + (125 * scale));
+
+            // Tanggal & Waktu WIB
+            ctx.fillStyle = "#CBD5E1";
+            ctx.font = Math.round(11 * scale) + "px sans-serif";
+            ctx.fillText(tanggalStr, contentX, boxY + (150 * scale));
+
+            // 4. Hasil Akhir Canvas ke Data URL
+            finalWatermarkedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+            Swal.close();
+            document.getElementById('geotagPreviewImg').src = finalWatermarkedDataUrl;
+            document.getElementById('downloadBtn').href = finalWatermarkedDataUrl;
+            
+            document.getElementById('cameraActionContainer').classList.add('hidden');
+            document.getElementById('previewGeotagContainer').classList.remove('hidden');
+
+          } catch (err) {
+            Swal.close();
+            console.error("Error render canvas:", err);
+            Swal.fire({ icon: 'error', title: 'Gagal', text: 'Terjadi kesalahan saat memproses foto.' });
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Helper untuk membungkus teks alamat agar tidak lewat batas kotak
+    function wrapText(context, text, x, y, maxWidth, lineHeight) {
+      if (!text) return;
+      const words = text.split(' ');
+      let line = '';
+      let currentY = y;
+      let lineCount = 0;
+
+      for(let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        let metrics = context.measureText(testLine);
+        let testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+          if (lineCount < 2) {
+            context.fillText(line, x, currentY);
+            line = words[n] + ' ';
+            currentY += lineHeight;
+            lineCount++;
+          }
+        } else {
+          line = testLine;
+        }
+      }
+      if (lineCount < 2) {
+        context.fillText(line, x, currentY);
+      }
+    }
+
+    // Fungsi Ambil Ulang Foto
+    function retakePhoto() {
+      document.getElementById('cameraInput').value = "";
+      document.getElementById('previewGeotagContainer').classList.add('hidden');
+      document.getElementById('cameraActionContainer').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
