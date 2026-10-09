@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live Geotagging Camera - Panca pilar Tangguh</title>
+  <title>Live Geotagging Camera - Panca Pilat Tangguh</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- SweetAlert2 -->
@@ -12,6 +12,12 @@
     .mirror-mode {
       transform: scaleX(-1);
     }
+    .multi-line-address {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 font-sans">
@@ -19,7 +25,7 @@
   <!-- Header -->
   <header class="w-full max-w-md text-center py-3">
     <h1 class="text-lg font-bold text-amber-400">📍 Live GPS Map Camera</h1>
-    <p class="text-xs text-slate-400">Panca pilar Tangguh - Anti-Fake GPS System</p>
+    <p class="text-xs text-slate-400">Panca Pilat Tangguh - Anti-Fake GPS System</p>
   </header>
 
   <!-- Main Content Box -->
@@ -45,13 +51,13 @@
           </svg>
         </button>
 
-        <!-- Live Watermark Overlay (Dilengkapi Peta Satelit & Teks) -->
-        <div class="absolute bottom-2 left-2 right-2 bg-black/80 backdrop-blur-sm p-3 rounded-xl border border-white/15 text-white pointer-events-none z-10 flex gap-2.5 items-center">
+        <!-- Live Watermark Overlay (Dilengkapi Peta Satelit & Alamat 3 Baris) -->
+        <div class="absolute bottom-2 left-2 right-2 bg-black/85 backdrop-blur-sm p-3 rounded-xl border border-white/15 text-white pointer-events-none z-10 flex gap-2.5 items-center">
           <!-- Peta Mini Satelit Live -->
-          <img id="liveMapImg" src="" alt="Map" class="w-20 h-20 rounded-lg object-cover border border-white/30 shrink-0 hidden">
+          <img id="liveMapImg" src="" alt="Map" class="w-24 h-24 rounded-lg object-cover border border-white/30 shrink-0 hidden">
           <div class="flex-1 min-w-0">
-            <div class="text-amber-400 font-bold text-xs mb-0.5">📍 GPS MAP Camera Panca pilar Tangguh</div>
-            <div id="liveAddress" class="text-[10px] text-slate-200 truncate leading-tight mb-1">Memuat alamat lokasi...</div>
+            <div class="text-amber-400 font-bold text-[11px] mb-0.5">📍 GPS MAP Camera Panca Pilat Tangguh</div>
+            <div id="liveAddress" class="text-[9.5px] text-slate-200 leading-tight mb-1 multi-line-address">Memuat alamat lokasi...</div>
             <div id="liveLatLon" class="text-[10px] text-sky-400 font-mono">Lat: 0.00000, Lon: 0.00000</div>
             <div id="liveDateTime" class="text-[9px] text-slate-300 mt-0.5">---</div>
           </div>
@@ -97,7 +103,7 @@
 
   <!-- Footer -->
   <footer class="w-full text-center py-3 text-xs text-slate-500">
-    &copy; 2026 Panca pilar Tangguh. All rights reserved.
+    &copy; 2026 Panca Pilat Tangguh. All rights reserved.
   </footer>
 
   <!-- Script Logika Aplikasi -->
@@ -223,7 +229,6 @@
 
       currentUserGps = { lat: latestSample.lat, lon: latestSample.lon };
 
-      // Generate Peta Mini Satelit Spesifik (Zoom 16) dengan Logo Google & Pin Merah
       generateSatelliteMapDataUrl(latestSample.lat, latestSample.lon).then(dataUrl => {
         mapDataUrl = dataUrl;
         const mapEl = document.getElementById('liveMapImg');
@@ -249,10 +254,9 @@
       startLiveCameraStream();
     }
 
-    // Fungsi pembuat peta satelit spesifik beresolusi tinggi (Esri World Imagery)
     async function generateSatelliteMapDataUrl(lat, lon) {
       return new Promise((resolve) => {
-        const zoom = 16; // Zoom lebih dekat & spesifik (menampakkan bangunan/jalan)
+        const zoom = 16;
         const n = Math.pow(2, zoom);
         const x = (lon + 180) / 360 * n;
         const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
@@ -275,7 +279,6 @@
           
           ctx.drawImage(img, offsetX - 90, offsetY - 90, 180, 180, 0, 0, 180, 180);
           
-          // Teks "Google" di pojok kiri bawah peta
           ctx.fillStyle = "#FFFFFF";
           ctx.font = "bold 13px sans-serif";
           ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
@@ -283,7 +286,6 @@
           ctx.fillText("Google", 8, 170);
           ctx.shadowBlur = 0;
 
-          // Pin merah penanda lokasi di tengah peta
           ctx.fillStyle = "#EF4444";
           ctx.beginPath();
           ctx.arc(90, 90, 7, 0, 2 * Math.PI);
@@ -366,7 +368,7 @@
       startLiveCameraStream();
     }
 
-    // 5. Ambil Gambar & Render Peta Satelit + Logo + Watermark ke Canvas
+    // 5. Ambil Gambar & Render Peta Satelit + Logo + Watermark Diperluas (3 Baris Alamat)
     function captureLivePhoto() {
       const videoElement = document.getElementById('videoElement');
       const canvas = document.getElementById('cameraCanvas');
@@ -411,7 +413,6 @@
 
       const scale = targetWidth / 420;
 
-      // Render Logo dari file logo.png
       if (LOGO_URL) {
         const logoImg = new Image();
         logoImg.crossOrigin = "anonymous";
@@ -434,13 +435,13 @@
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
 
-      const boxHeight = Math.round(115 * scale);
+      // Tinggi box diperbesar (135 * scale) agar muat alamat 3 baris
+      const boxHeight = Math.round(135 * scale);
       const boxY = canvas.height - boxHeight - Math.round(10 * scale);
       const boxX = Math.round(10 * scale);
       const boxWidth = width - Math.round(20 * scale);
 
-      // Background Kotak Watermark
-      ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
         ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(12 * scale));
@@ -449,13 +450,13 @@
         ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
       }
 
-      // Muat Gambar Peta Satelit dari Data URL lokal
       if (mapDataUrl) {
         const mapImg = new Image();
         mapImg.onload = () => {
-          const mapSize = Math.round(95 * scale);
-          const mapX = boxX + Math.round(10 * scale);
-          const mapY = boxY + Math.round(10 * scale);
+          // Ukuran peta diperbesar sedikit (110 * scale) agar serasi dengan box baru
+          const mapSize = Math.round(110 * scale);
+          const mapX = boxX + Math.round(12 * scale);
+          const mapY = boxY + Math.round(12 * scale);
 
           ctx.save();
           ctx.beginPath();
@@ -472,7 +473,7 @@
             ctx.strokeRect(mapX, mapY, mapSize, mapSize);
           }
 
-          drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, mapSize + Math.round(22 * scale));
+          drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, mapSize + Math.round(26 * scale));
         };
         mapImg.src = mapDataUrl;
       } else {
@@ -482,28 +483,61 @@
 
     function drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, textOffsetX) {
       const contentX = boxX + textOffsetX;
-      const maxTextWidth = boxWidth - textOffsetX - Math.round(10 * scale);
+      const maxTextWidth = boxWidth - textOffsetX - Math.round(12 * scale);
       
+      // Judul Watermark
       ctx.fillStyle = "#F59E0B";
       ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
-      ctx.fillText("📍 GPS MAP Camera Panca pilar Tangguh", contentX, boxY + Math.round(22 * scale));
+      ctx.fillText("📍 GPS MAP Camera Panca Pilat Tangguh", contentX, boxY + Math.round(22 * scale));
 
+      // Alamat Lengkap (Diberi kuota hingga 3 baris)
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = Math.round(11 * scale) + "px sans-serif";
-      wrapText(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), maxTextWidth, Math.round(14 * scale));
+      ctx.font = Math.round(10.5 * scale) + "px sans-serif";
+      wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), maxTextWidth, Math.round(13.5 * scale));
 
+      // Koordinat Lat & Long (Ditempatkan di bawah 3 baris alamat)
       ctx.fillStyle = "#38BDF8";
       ctx.font = "bold " + Math.round(11 * scale) + "px monospace";
-      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(78 * scale));
+      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(95 * scale));
 
+      // Tanggal & Waktu WIB
       const now = getRealTime();
       const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
       
       ctx.fillStyle = "#CBD5E1";
       ctx.font = Math.round(10 * scale) + "px sans-serif";
-      ctx.fillText(tanggalStr, contentX, boxY + Math.round(98 * scale));
+      ctx.fillText(tanggalStr, contentX, boxY + Math.round(115 * scale));
 
       finalizeCanvasImage();
+    }
+
+    // Fungsi pembungkus teks khusus hingga 3 baris agar alamat panjang muat sempurna
+    function wrapTextThreeLines(context, text, x, y, maxWidth, lineHeight) {
+      if (!text) return;
+      const words = text.split(' ');
+      let line = '';
+      let currentY = y;
+      let lineCount = 1;
+
+      for(let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        let metrics = context.measureText(testLine);
+        let testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+          if (lineCount < 3) {
+            context.fillText(line, x, currentY);
+            line = words[n] + ' ';
+            currentY += lineHeight;
+            lineCount++;
+          } else {
+            line = line.trim() + '...';
+            break;
+          }
+        } else {
+          line = testLine;
+        }
+      }
+      context.fillText(line.trim(), x, currentY);
     }
 
     function finalizeCanvasImage() {
@@ -519,33 +553,6 @@
 
       document.getElementById('liveCameraContainer').classList.add('hidden');
       document.getElementById('previewContainer').classList.remove('hidden');
-    }
-
-    function wrapText(context, text, x, y, maxWidth, lineHeight) {
-      if (!text) return;
-      const words = text.split(' ');
-      let line = '';
-      let currentY = y;
-      let lineCount = 0;
-
-      for(let n = 0; n < words.length; n++) {
-        let testLine = line + words[n] + ' ';
-        let metrics = context.measureText(testLine);
-        let testWidth = metrics.width;
-        if (testWidth > maxWidth && n > 0) {
-          if (lineCount < 2) {
-            context.fillText(line, x, currentY);
-            line = words[n] + ' ';
-            currentY += lineHeight;
-            lineCount++;
-          }
-        } else {
-          line = testLine;
-        }
-      }
-      if (lineCount < 2) {
-        context.fillText(line, x, currentY);
-      }
     }
 
     function retakePhoto() {
