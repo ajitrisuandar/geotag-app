@@ -18,6 +18,10 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    /* Efek bayangan teks untuk keterbacaan di atas kotak transparan */
+    .text-shadow-md {
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-3 font-sans">
@@ -51,8 +55,10 @@
           </svg>
         </button>
 
-        <!-- Live Watermark Overlay -->
-        <div class="absolute bottom-2 left-2 right-2 bg-black/85 backdrop-blur-sm p-2.5 rounded-xl border border-white/15 text-white pointer-events-none z-10 flex gap-2.5 items-center">
+        <!-- Live Watermark Overlay (Dilengkapi Peta Satelit & Alamat 3 Baris) -->
+        <!-- PERBAIKAN: bg-black/85 diubah menjadi bg-black/10 dan ditambahkan text-shadow-md -->
+        <div class="absolute bottom-2 left-2 right-2 bg-black/10 drop-shadow-lg backdrop-blur-sm p-2.5 rounded-xl border border-white/10 text-white pointer-events-none z-10 flex gap-2.5 items-center text-shadow-md">
+          <!-- Peta Mini Satelit Live -->
           <img id="liveMapImg" src="" alt="Map" class="w-24 h-24 rounded-lg object-cover border border-white/30 shrink-0 hidden">
           <div class="flex-1 min-w-0">
             <div class="text-amber-400 font-bold text-[11px] mb-0.5">📍 GPS MAP Camera Panca Pilar Tangguh</div>
@@ -63,9 +69,8 @@
         </div>
 
         <!-- Logo di Pojok Kiri Atas Live Video -->
-        <!-- Perbaikan Kecerahan Live Logo -->
         <div class="absolute top-3 left-3 pointer-events-none z-10">
-          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-12 w-auto drop-shadow-md filter brightness-[1.5]">
+          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-12 w-auto drop-shadow-md brightness-[1.5]">
         </div>
       </div>
 
@@ -151,7 +156,7 @@
 
       const maxSamples = 2;
       let gpsSamples = [];
-      let currentSampleIndex = 0;
+     let currentSampleIndex = 0;
 
       function fetchSingleGps() {
         if (currentSampleIndex >= maxSamples) {
@@ -251,7 +256,7 @@
 
       document.getElementById('gpsVerificationBox').classList.add('hidden');
       document.getElementById('liveCameraContainer').classList.remove('hidden');
-      startLiveCameraStream();
+  0 startLiveCameraStream();
     }
 
     async function generateSatelliteMapDataUrl(lat, lon) {
@@ -368,6 +373,7 @@
       startLiveCameraStream();
     }
 
+    // 5. Ambil Gambar & Render Peta Satelit + Logo + Watermark Alamat 3 Baris
     function captureLivePhoto() {
       const videoElement = document.getElementById('videoElement');
       const canvas = document.getElementById('cameraCanvas');
@@ -416,29 +422,9 @@
         const logoImg = new Image();
         logoImg.crossOrigin = "anonymous";
         logoImg.onload = () => {
-          
-          const logoPadding = Math.round(5 * scale); 
           const logoHeight = Math.round(42 * scale);
           const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
-          const logoX = Math.round(15 * scale);
-          const logoY = Math.round(15 * scale);
-
-          const bgWidth = logoWidth + (2 * logoPadding);
-          const bgHeight = logoHeight + (2 * logoPadding);
-          const bgX = logoX - logoPadding;
-          const bgY = logoY - logoPadding;
-
-          ctx.fillStyle = "rgba(255, 255, 255, 0.6)"; // Putih semi-transparan (60%)
-          if (typeof ctx.roundRect === 'function') {
-            ctx.beginPath();
-            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, Math.round(10 * scale));
-            ctx.fill();
-          } else {
-            ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
-          }
-
-          ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-
+          ctx.drawImage(logoImg, Math.round(15 * scale), Math.round(15 * scale), logoWidth, logoHeight);
           loadMapAndRenderWatermark(canvas, scale);
         };
         logoImg.onerror = () => {
@@ -459,13 +445,18 @@
       const boxX = Math.round(10 * scale);
       const boxWidth = width - Math.round(20 * scale);
 
-      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+      // PERBAIKAN: bg-black/85 diubah menjadi bg-black/10 untuk kotak transparan
+      ctx.fillStyle = "rgba(0, 0, 0, 0.1)"; 
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
         ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(12 * scale));
         ctx.fill();
       } else {
         ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        // PERBAIKAN: Sedikit border untuk kotak transparan jika roundRect tidak didukung
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
       }
 
       if (mapDataUrl) {
@@ -502,6 +493,12 @@
       const contentX = boxX + textOffsetX;
       const maxTextWidth = boxWidth - textOffsetX - Math.round(12 * scale);
       
+      // PERBAIKAN: Menambahkan bayangan teks untuk hasil foto agar tetap terlihat di atas kotak transparan
+      ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+      ctx.shadowBlur = 4 * scale;
+      ctx.shadowOffsetX = 2 * scale;
+      ctx.shadowOffsetY = 2 * scale;
+
       ctx.fillStyle = "#F59E0B";
       ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
       ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(22 * scale));
@@ -520,6 +517,12 @@
       ctx.fillStyle = "#CBD5E1";
       ctx.font = Math.round(10 * scale) + "px sans-serif";
       ctx.fillText(tanggalStr, contentX, boxY + Math.round(115 * scale));
+
+      // PERBAIKAN: Mengatur ulang bayangan teks
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
 
       finalizeCanvasImage();
     }
