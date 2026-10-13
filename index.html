@@ -52,20 +52,20 @@
         </button>
 
         <!-- Live Watermark Overlay (Dilengkapi Peta Satelit & Alamat 3 Baris) -->
-        <div class="absolute bottom-2 left-2 right-2 bg-black/85 backdrop-blur-sm p-2.5 rounded-xl border border-white/15 text-white pointer-events-none z-10 flex gap-2.5 items-center">
+        <div class="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-[2px] p-2 rounded-lg border border-white/25 text-white pointer-events-none z-10 flex gap-2 items-center shadow-[0_1px_5px_rgba(0,0,0,0.55)]">
           <!-- Peta Mini Satelit Live -->
-          <img id="liveMapImg" src="" alt="Map" class="w-24 h-24 rounded-lg object-cover border border-white/30 shrink-0 hidden">
+          <img id="liveMapImg" src="" alt="Map" class="w-16 h-16 rounded-md object-cover border border-white/60 shrink-0 hidden">
           <div class="flex-1 min-w-0">
-            <div class="text-amber-400 font-bold text-[11px] mb-0.5">📍 GPS MAP Camera Panca Pilar Tangguh</div>
-            <div id="liveAddress" class="text-[9.5px] text-slate-200 leading-tight mb-1 multi-line-address">Memuat alamat lokasi...</div>
-            <div id="liveLatLon" class="text-[10px] text-sky-400 font-mono">Lat: 0.00000, Lon: 0.00000</div>
-            <div id="liveDateTime" class="text-[9px] text-slate-300 mt-0.5">---</div>
+            <div class="text-amber-300 font-bold text-[11px] mb-0.5 [text-shadow:0_1px_3px_rgba(0,0,0,1)]">📍 GPS MAP Camera Panca Pilar Tangguh</div>
+            <div id="liveAddress" class="text-[10px] text-white leading-tight mb-1 multi-line-address [text-shadow:0_1px_3px_rgba(0,0,0,1)]">Memuat alamat lokasi...</div>
+            <div id="liveLatLon" class="text-[10px] text-sky-300 font-mono font-semibold [text-shadow:0_1px_3px_rgba(0,0,0,1)]">Lat: 0.00000, Lon: 0.00000</div>
+            <div id="liveDateTime" class="text-[9px] text-white mt-0.5 font-medium [text-shadow:0_1px_3px_rgba(0,0,0,1)]">---</div>
           </div>
         </div>
 
         <!-- Logo di Pojok Kiri Atas Live Video -->
-        <div class="absolute top-3 left-3 pointer-events-none z-10 bg-white/95 p-2 rounded-xl border-2 border-white shadow-[0_4px_14px_rgba(0,0,0,0.85)]">
-          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-12 w-auto object-contain drop-shadow-sm">
+        <div class="absolute top-2 left-2 pointer-events-none z-10">
+          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-7 w-auto max-w-[88px] object-contain opacity-90 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
         </div>
       </div>
 
@@ -417,51 +417,29 @@
         const logoImg = new Image();
         logoImg.crossOrigin = "anonymous";
         logoImg.onload = () => {
-          const logoHeight = Math.round(42 * scale);
+          const logoHeight = Math.round(28 * scale);
           const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
-          const logoPadding = Math.round(8 * scale);
-          const logoX = Math.round(15 * scale);
-          const logoY = Math.round(15 * scale);
-          const cardWidth = logoWidth + (logoPadding * 2);
-          const cardHeight = logoHeight + (logoPadding * 2);
-          const cardRadius = Math.round(8 * scale);
+          const logoX = Math.round(10 * scale);
+          const logoY = Math.round(10 * scale);
+          const logoPad = Math.round(4 * scale);
 
-          // Panel terang, garis tepi, dan bayangan agar logo tetap terbaca
-          // baik pada latar foto gelap maupun terang.
+          // Latar gelap transparan tipis agar logo kecil tetap terbaca tanpa menutupi foto.
           ctx.save();
-          ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
-          ctx.shadowBlur = Math.round(8 * scale);
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = Math.round(3 * scale);
-          ctx.fillStyle = "rgba(255, 255, 255, 0.97)";
-          ctx.beginPath();
+          ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
           if (typeof ctx.roundRect === "function") {
-            ctx.roundRect(logoX, logoY, cardWidth, cardHeight, cardRadius);
+            ctx.beginPath();
+            ctx.roundRect(logoX, logoY, logoWidth + logoPad * 2, logoHeight + logoPad * 2, Math.round(5 * scale));
+            ctx.fill();
           } else {
-            ctx.rect(logoX, logoY, cardWidth, cardHeight);
+            ctx.fillRect(logoX, logoY, logoWidth + logoPad * 2, logoHeight + logoPad * 2);
           }
-          ctx.fill();
           ctx.restore();
 
           ctx.save();
-          ctx.strokeStyle = "rgba(15, 23, 42, 0.85)";
-          ctx.lineWidth = Math.max(2, Math.round(1.5 * scale));
-          ctx.beginPath();
-          if (typeof ctx.roundRect === "function") {
-            ctx.roundRect(logoX, logoY, cardWidth, cardHeight, cardRadius);
-          } else {
-            ctx.rect(logoX, logoY, cardWidth, cardHeight);
-          }
-          ctx.stroke();
+          ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
+          ctx.shadowBlur = Math.round(3 * scale);
+          ctx.drawImage(logoImg, logoX + logoPad, logoY + logoPad, logoWidth, logoHeight);
           ctx.restore();
-
-          ctx.drawImage(
-            logoImg,
-            logoX + logoPadding,
-            logoY + logoPadding,
-            logoWidth,
-            logoHeight
-          );
           loadMapAndRenderWatermark(canvas, scale);
         };
         logoImg.onerror = () => {
@@ -482,7 +460,7 @@
       const boxX = Math.round(10 * scale);
       const boxWidth = width - Math.round(20 * scale);
 
-      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
         ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(12 * scale));
@@ -494,7 +472,7 @@
       if (mapDataUrl) {
         const mapImg = new Image();
         mapImg.onload = () => {
-          const mapSize = Math.round(110 * scale);
+          const mapSize = Math.round(82 * scale);
           const mapX = boxX + Math.round(12 * scale);
           const mapY = boxY + Math.round(12 * scale);
 
