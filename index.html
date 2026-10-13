@@ -41,31 +41,31 @@
     <!-- 2. Kotak Kamera Live & Watermark Overlay -->
     <div id="liveCameraContainer" class="w-full hidden flex flex-col items-center relative">
       <div class="w-full rounded-xl overflow-hidden shadow-lg border border-slate-700 bg-black relative">
-        <!-- Elemen Video Live -->
+        <!-- Elemen Video Live (Tinggi diperbesar menjadi 540px agar lebih luas) -->
         <video id="videoElement" autoplay playsinline muted class="w-full h-[540px] object-cover"></video>
         
-        <!-- Tombol Ganti Kamera (Depan / Belakang) -->
+        <!-- Tombol Ganti Kamera (Depan / Belakang) di Pojok Kanan Atas Video -->
         <button onclick="switchCamera()" class="absolute top-3 right-3 bg-slate-900/80 hover:bg-slate-800 text-amber-400 p-2.5 rounded-full shadow-lg backdrop-blur-md transition duration-200 border border-slate-700 flex items-center justify-center z-10" title="Ganti Kamera">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
         </button>
 
-        <!-- Live Watermark Overlay (Jauh Lebih Transparan: bg-black/10, blur minimal) -->
-        <div class="absolute bottom-2 left-2 right-2 bg-black/10 backdrop-blur-sm p-2.5 rounded-xl border border-white/20 text-white pointer-events-none z-10 flex gap-2.5 items-center">
+        <!-- Live Watermark Overlay (Dilengkapi Peta Satelit & Alamat 3 Baris) -->
+        <div class="absolute bottom-2 left-2 right-2 bg-black/85 backdrop-blur-sm p-2.5 rounded-xl border border-white/15 text-white pointer-events-none z-10 flex gap-2.5 items-center">
           <!-- Peta Mini Satelit Live -->
           <img id="liveMapImg" src="" alt="Map" class="w-24 h-24 rounded-lg object-cover border border-white/30 shrink-0 hidden">
           <div class="flex-1 min-w-0">
-            <div class="text-amber-400 font-bold text-[11px] mb-0.5 drop-shadow">📍 GPS MAP Camera Panca Pilar Tangguh</div>
-            <div id="liveAddress" class="text-[9.5px] text-slate-100 leading-tight mb-1 multi-line-address drop-shadow">Memuat alamat lokasi...</div>
-            <div id="liveLatLon" class="text-[10px] text-sky-300 font-mono drop-shadow">Lat: 0.00000, Lon: 0.00000</div>
-            <div id="liveDateTime" class="text-[9px] text-slate-200 mt-0.5 drop-shadow">---</div>
+            <div class="text-amber-400 font-bold text-[11px] mb-0.5">📍 GPS MAP Camera Panca Pilar Tangguh</div>
+            <div id="liveAddress" class="text-[9.5px] text-slate-200 leading-tight mb-1 multi-line-address">Memuat alamat lokasi...</div>
+            <div id="liveLatLon" class="text-[10px] text-sky-400 font-mono">Lat: 0.00000, Lon: 0.00000</div>
+            <div id="liveDateTime" class="text-[9px] text-slate-300 mt-0.5">---</div>
           </div>
         </div>
 
-        <!-- Logo di Pojok Kiri Atas Live Video (Opasitas penuh agar terang, drop-shadow tetap ada) -->
+        <!-- Logo di Pojok Kiri Atas Live Video -->
         <div class="absolute top-3 left-3 pointer-events-none z-10">
-          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-10 w-auto drop-shadow-md">
+          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-12 w-auto drop-shadow-md">
         </div>
       </div>
 
@@ -368,7 +368,7 @@
       startLiveCameraStream();
     }
 
-    // 5. Ambil Gambar & Render Peta Satelit + Logo Bright + Watermark Transparan
+    // 5. Ambil Gambar & Render Peta Satelit + Logo + Watermark Alamat 3 Baris
     function captureLivePhoto() {
       const videoElement = document.getElementById('videoElement');
       const canvas = document.getElementById('cameraCanvas');
@@ -380,12 +380,12 @@
       const cHeight = videoElement.clientHeight;
 
       const vRatio = vWidth / vHeight;
-      const cRatio = cWidth / cRatio;
+      const cRatio = cWidth / cHeight;
 
       let sWidth, sHeight, sx, sy;
       if (vRatio > cRatio) {
         sHeight = vHeight;
-        sWidth = vHeight * cRatio;
+  0000sWidth = vHeight * cRatio;
         sx = (vWidth - sWidth) / 2;
         sy = 0;
       } else {
@@ -411,50 +411,40 @@
         ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
       }
 
-      const scale = targetWidth / 420;
-
       if (LOGO_URL) {
         const logoImg = new Image();
         logoImg.crossOrigin = "anonymous";
         logoImg.onload = () => {
-          // Sesuaikan koordinat logo karena kotak background semi-transparan telah dihapus
-          const logoHeight = Math.round(40 * scale);
+          // Gambar logo di pojok kiri atas dengan ukuran tetap
+          const logoHeight = 60; // Ukuran logo tetap agar tajam
           const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
-          
-          const logoX = Math.round(15 * scale); // Margin sedikit lebih besar
-          const logoY = Math.round(15 * scale); // Margin sedikit lebih besar
-
-          // Render Logo dengan kecerahan maksimal (opasitas penuh)
-          ctx.save();
-          ctx.globalAlpha = 1.0; 
-          ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-          ctx.restore();
-
-          loadMapAndRenderWatermark(canvas, scale);
+          ctx.drawImage(logoImg, 20, 20, logoWidth, logoHeight);
+          loadMapAndRenderWatermark(canvas);
         };
         logoImg.onerror = () => {
-          loadMapAndRenderWatermark(canvas, scale);
+          loadMapAndRenderWatermark(canvas);
         };
         logoImg.src = LOGO_URL;
       } else {
-        loadMapAndRenderWatermark(canvas, scale);
+        loadMapAndRenderWatermark(canvas);
       }
     }
 
-    function loadMapAndRenderWatermark(canvas, scale) {
+    function loadMapAndRenderWatermark(canvas) {
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
+      const height = canvas.height;
 
-      const boxHeight = Math.round(135 * scale);
-      const boxY = canvas.height - boxHeight - Math.round(10 * scale);
-      const boxX = Math.round(10 * scale);
-      const boxWidth = width - Math.round(20 * scale);
+      // Bingkai Overlay Alamat (Gunakan ukuran piksel absolut untuk ketajaman)
+      const boxHeight = 220; // Ukuran bingkai absolut
+      const boxY = height - boxHeight - 20; // Posisi absolut dari bawah
+      const boxX = 20; // Posisi absolut dari kiri
+      const boxWidth = width - 40; // Posisi absolut lebar
 
-      // Bingkai Watermark Bawah Tetap Jauh Lebih Transparan (rgba(0, 0, 0, 0.15))
-      ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(12 * scale));
+        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 18); // Radius sudut absolut
         ctx.fill();
       } else {
         ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
@@ -463,69 +453,58 @@
       if (mapDataUrl) {
         const mapImg = new Image();
         mapImg.onload = () => {
-          const mapSize = Math.round(110 * scale);
-          const mapX = boxX + Math.round(12 * scale);
-          const mapY = boxY + Math.round(12 * scale);
+          // Gambar peta mini dengan ukuran tetap
+          const mapSize = 180; // Ukuran peta tetap agar tajam
+          const mapX = boxX + 20; // Posisi absolut
+          const mapY = boxY + 20; // Posisi absolut
 
-          // Terapkan opasitas untuk peta satelit (Setengah Transparan: 0.5)
           ctx.save();
-          ctx.globalAlpha = 0.5;
           ctx.beginPath();
-          if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(8 * scale));
+          if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, 12); // Radius sudut absolut
           ctx.clip();
           ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
           ctx.restore();
 
-          // Garis tepi peta
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; 
-          ctx.lineWidth = 1.5;
+          // Bingkai Peta
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 2.5; // Ketebalan bingkai absolut
           if (typeof ctx.roundRect === 'function') {
-            ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(8 * scale)); ctx.stroke();
+            ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, 12); ctx.stroke();
           } else {
             ctx.strokeRect(mapX, mapY, mapSize, mapSize);
           }
 
-          drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, mapSize + Math.round(26 * scale));
+          drawWatermarkText(ctx, boxX, boxY, boxWidth, mapSize + 40); // Jarak teks absolut
         };
         mapImg.src = mapDataUrl;
       } else {
-        drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, Math.round(15 * scale));
+        drawWatermarkText(ctx, boxX, boxY, boxWidth, 30); // Jarak teks absolut
       }
     }
 
-    function drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, textOffsetX) {
+    function drawWatermarkText(ctx, boxX, boxY, boxWidth, textOffsetX) {
       const contentX = boxX + textOffsetX;
-      const maxTextWidth = boxWidth - textOffsetX - Math.round(12 * scale);
+      const maxTextWidth = boxWidth - textOffsetX - 20; // Lebar teks maksimal absolut
       
-      // Terapkan opasitas teks umum (Opasitas Teks: 0.6)
-      ctx.save();
-      ctx.globalAlpha = 0.6;
-
-      // Judul Watermark
+      // Ukuran font dan posisi absolut yang didasarkan pada canvas tinggi untuk ketajaman
       ctx.fillStyle = "#F59E0B";
-      ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
-      ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(22 * scale));
+      ctx.font = "bold 20px sans-serif"; // Ukuran font absolut
+      ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + 36); // Posisi absolut
 
-      // Alamat
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = Math.round(10.5 * scale) + "px sans-serif";
-      wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), maxTextWidth, Math.round(13.5 * scale));
+      ctx.font = "18px sans-serif"; // Ukuran font absolut
+      wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + 68, maxTextWidth, 24); // Posisi dan spasi absolut
 
-      // Lat/Lon
       ctx.fillStyle = "#38BDF8";
-      ctx.font = "bold " + Math.round(11 * scale) + "px monospace";
-      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(95 * scale));
+      ctx.font = "bold 19px monospace"; // Ukuran font absolut
+      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + 160); // Posisi absolut
 
-      // Tanggal
       const now = getRealTime();
       const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
       
-      ctx.fillStyle = "#E2E8F0";
-      ctx.font = Math.round(10 * scale) + "px sans-serif";
-      ctx.fillText(tanggalStr, contentX, boxY + Math.round(115 * scale));
-
-      // Pulihkan opasitas
-      ctx.restore();
+      ctx.fillStyle = "#CBD5E1";
+     ctx.font = "18px sans-serif"; // Ukuran font absolut
+      ctx.fillText(tanggalStr, contentX, boxY + 196); // Posisi absolut
 
       finalizeCanvasImage();
     }
