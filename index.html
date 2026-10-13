@@ -51,8 +51,8 @@
           </svg>
         </button>
 
-        <!-- Live Watermark Overlay (Lebih Transparan: bg-black/45) -->
-        <div class="absolute bottom-2 left-2 right-2 bg-black/45 backdrop-blur-md p-2.5 rounded-xl border border-white/20 text-white pointer-events-none z-10 flex gap-2.5 items-center">
+        <!-- Live Watermark Overlay (Jauh Lebih Transparan: bg-black/10, blur minimal) -->
+        <div class="absolute bottom-2 left-2 right-2 bg-black/10 backdrop-blur-sm p-2.5 rounded-xl border border-white/20 text-white pointer-events-none z-10 flex gap-2.5 items-center">
           <!-- Peta Mini Satelit Live -->
           <img id="liveMapImg" src="" alt="Map" class="w-24 h-24 rounded-lg object-cover border border-white/30 shrink-0 hidden">
           <div class="flex-1 min-w-0">
@@ -63,9 +63,9 @@
           </div>
         </div>
 
-        <!-- Logo di Pojok Kiri Atas Live Video (Dengan Background Semi-Transparan) -->
-        <div class="absolute top-3 left-3 pointer-events-none z-10 bg-black/30 backdrop-blur-sm p-1.5 rounded-xl border border-white/15">
-          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-10 w-auto opacity-90 drop-shadow-md">
+        <!-- Logo di Pojok Kiri Atas Live Video (Tanpa Background/Blur, Opasitas Sangat Rendah) -->
+        <div class="absolute top-3 left-3 pointer-events-none z-10">
+          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-10 w-auto opacity-40 drop-shadow-md">
         </div>
       </div>
 
@@ -425,8 +425,8 @@
           const badgeW = logoWidth + Math.round(16 * scale);
           const badgeH = logoHeight + Math.round(16 * scale);
 
-          // Render Kotak Background Semi-Transparan untuk Logo
-          ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+          // Render Kotak Background Semi-Transparan untuk Logo (Jauh Lebih Tipis)
+          ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
           if (typeof ctx.roundRect === 'function') {
             ctx.beginPath();
             ctx.roundRect(badgeX, badgeY, badgeW, badgeH, Math.round(10 * scale));
@@ -435,9 +435,9 @@
             ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
           }
 
-          // Render Logo dengan Transparansi Lembut
+          // Render Logo dengan Transparansi Sangat Lembut
           ctx.save();
-          ctx.globalAlpha = 0.9;
+          ctx.globalAlpha = 0.4; // Jauh lebih transparan
           ctx.drawImage(logoImg, badgeX + Math.round(8 * scale), badgeY + Math.round(8 * scale), logoWidth, logoHeight);
           ctx.restore();
 
@@ -461,8 +461,8 @@
       const boxX = Math.round(10 * scale);
       const boxWidth = width - Math.round(20 * scale);
 
-      // Bingkai Watermark Bawah Dibuat Transparan (rgba(0, 0, 0, 0.45))
-      ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+      // Bingkai Watermark Bawah Dibuat Jauh Lebih Transparan (rgba(0, 0, 0, 0.15))
+      ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
       if (typeof ctx.roundRect === 'function') {
         ctx.beginPath();
         ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(12 * scale));
@@ -478,14 +478,17 @@
           const mapX = boxX + Math.round(12 * scale);
           const mapY = boxY + Math.round(12 * scale);
 
+          // Terapkan opasitas untuk peta satelit
           ctx.save();
+          ctx.globalAlpha = 0.5; // Peta satelit setengah transparan
           ctx.beginPath();
           if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(8 * scale));
           ctx.clip();
           ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
           ctx.restore();
 
-          ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+          // Garis tepi peta
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; // Garis tepi juga lebih transparan
           ctx.lineWidth = 1.5;
           if (typeof ctx.roundRect === 'function') {
             ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(8 * scale)); ctx.stroke();
@@ -505,24 +508,35 @@
       const contentX = boxX + textOffsetX;
       const maxTextWidth = boxWidth - textOffsetX - Math.round(12 * scale);
       
+      // Terapkan opasitas teks umum
+      ctx.save();
+      ctx.globalAlpha = 0.6; // Opasitas teks umum 60%
+
+      // Judul Watermark
       ctx.fillStyle = "#F59E0B";
       ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
       ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(22 * scale));
 
+      // Alamat
       ctx.fillStyle = "#FFFFFF";
       ctx.font = Math.round(10.5 * scale) + "px sans-serif";
       wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), maxTextWidth, Math.round(13.5 * scale));
 
+      // Lat/Lon
       ctx.fillStyle = "#38BDF8";
       ctx.font = "bold " + Math.round(11 * scale) + "px monospace";
       ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(95 * scale));
 
+      // Tanggal
       const now = getRealTime();
       const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
       
       ctx.fillStyle = "#E2E8F0";
       ctx.font = Math.round(10 * scale) + "px sans-serif";
       ctx.fillText(tanggalStr, contentX, boxY + Math.round(115 * scale));
+
+      // Pulihkan opasitas
+      ctx.restore();
 
       finalizeCanvasImage();
     }
