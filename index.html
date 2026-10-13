@@ -63,9 +63,9 @@
           </div>
         </div>
 
-        <!-- Logo di Pojok Kiri Atas Live Video -->
-        <div class="absolute top-3 left-3 pointer-events-none z-10">
-          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-12 w-auto drop-shadow-md">
+        <!-- MODIFIKASI: Logo di Pojok Kiri Atas Live Video dengan Bingkai Putih -->
+        <div class="absolute top-3 left-3 pointer-events-none z-10 bg-white p-1.5 rounded-lg shadow-md border border-slate-200">
+          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-10 w-auto">
         </div>
       </div>
 
@@ -233,7 +233,7 @@
         mapDataUrl = dataUrl;
         const mapEl = document.getElementById('liveMapImg');
         if (mapEl && mapDataUrl) {
-          mapEl.src = mapDataUrl;
+         mapEl.src = mapDataUrl;
           mapEl.classList.remove('hidden');
         }
       });
@@ -368,7 +368,7 @@
       startLiveCameraStream();
     }
 
-    // 5. Ambil Gambar & Render Peta Satelit + Logo + Watermark Alamat 3 Baris
+    // 5. Ambil Gambar & Render Peta Satelit + Logo (Dengan Bingkai Putih) + Watermark
     function captureLivePhoto() {
       const videoElement = document.getElementById('videoElement');
       const canvas = document.getElementById('cameraCanvas');
@@ -417,15 +417,46 @@
         const logoImg = new Image();
         logoImg.crossOrigin = "anonymous";
         logoImg.onload = () => {
-          const logoHeight = Math.round(42 * scale);
+          // Dimensi Logo Asli
+          const baseLogoHeight = 42;
+          const logoHeight = Math.round(baseLogoHeight * scale);
           const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
-          ctx.drawImage(logoImg, Math.round(15 * scale), Math.round(15 * scale), logoWidth, logoHeight);
+
+          // Dimensi dan Posisi Bingkai Putih
+          const padding = Math.round(6 * scale); // Padding di sekitar logo
+          const frameX = Math.round(15 * scale) - padding;
+          const frameY = Math.round(15 * scale) - padding;
+          const frameWidth = logoWidth + (2 * padding);
+          const frameHeight = logoHeight + (2 * padding);
+          const frameRadius = Math.round(8 * scale); // Sudut membulat bingkai
+
+          // MODIFIKASI: Gambar Bingkai Putih Berbayang (Background Logo)
+          ctx.save();
+          ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+          ctx.shadowBlur = Math.round(4 * scale);
+          ctx.shadowOffsetX = Math.round(1 * scale);
+          ctx.shadowOffsetY = Math.round(1 * scale);
+          
+          ctx.fillStyle = "#FFFFFF";
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(frameX, frameY, frameWidth, frameHeight, frameRadius);
+            ctx.fill();
+          } else {
+            ctx.fillRect(frameX, frameY, frameWidth, frameHeight); // Fallback
+          }
+          ctx.restore(); // Reset shadow agar tidak mempengaruhi elemen lain
+
+          // Gambar Logo di tengah bingkai putih
+          ctx.drawImage(logoImg, frameX + padding, frameY + padding, logoWidth, logoHeight);
+          
           loadMapAndRenderWatermark(canvas, scale);
         };
         logoImg.onerror = () => {
           loadMapAndRenderWatermark(canvas, scale);
         };
         logoImg.src = LOGO_URL;
+        
       } else {
         loadMapAndRenderWatermark(canvas, scale);
       }
@@ -485,10 +516,10 @@
       
       ctx.fillStyle = "#F59E0B";
       ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
-      ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(22 * scale));
+     ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(22 * scale));
 
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = Math.round(10.5 * scale) + "px sans-serif";
+     ctx.font = Math.round(10.5 * scale) + "px sans-serif";
       wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), maxTextWidth, Math.round(13.5 * scale));
 
       ctx.fillStyle = "#38BDF8";
@@ -499,7 +530,7 @@
       const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
       
       ctx.fillStyle = "#CBD5E1";
-      ctx.font = Math.round(10 * scale) + "px sans-serif";
+     ctx.font = Math.round(10 * scale) + "px sans-serif";
       ctx.fillText(tanggalStr, contentX, boxY + Math.round(115 * scale));
 
       finalizeCanvasImage();
@@ -516,7 +547,7 @@
         let testLine = line + words[n] + ' ';
         let metrics = context.measureText(testLine);
         let testWidth = metrics.width;
-        if (testWidth > maxWidth && n > 0) {
+       if (testWidth > maxWidth && n > 0) {
           if (lineCount < 3) {
             context.fillText(line, x, currentY);
             line = words[n] + ' ';
