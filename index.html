@@ -14,16 +14,64 @@
     }
     .multi-line-address {
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+
+    /* --- PENGATURAN POSISI & ROTASI UI LIVE VIEW --- */
+
+    /* 1. Mode Portrait (Default) */
+    .mode-portrait #liveControlsContainer {
+      top: 12px;
+      right: 12px;
+      left: auto;
+    }
+    .mode-portrait #liveLogoContainer {
+      top: 12px;
+      left: 12px;
+      bottom: auto;
+      transform: none;
+    }
+    .mode-portrait #liveOverlayBox {
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      top: auto;
+      width: auto;
+      transform: none;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    /* 2. Mode Landscape */
+    .mode-landscape #liveControlsContainer {
+      top: 12px;
+      left: 12px;
+      right: auto;
+    }
+    .mode-landscape #liveLogoContainer {
+      bottom: 45px;
+      left: 45px;
+      top: auto;
+      transform: rotate(-90deg);
+      transform-origin: bottom left;
+    }
+    .mode-landscape #liveOverlayBox {
+      bottom: 500px;
+      right: 35px;
+      left: auto;
+      top: auto;
+      width: 250px; /* Diperkecil agar lebih kompak */
+      transform: rotate(-90deg);
+      transform-origin: bottom right;
+      background-color: rgba(0, 0, 0, 0.5);
     }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-3 font-sans">
 
   <!-- Header -->
-  <header class="w-full max-w-md text-center py-2">
+  <header class="w-full max-w-md text-center py-1">
     <h1 class="text-base font-bold text-amber-400">📍 Live GPS Map Camera</h1>
     <p class="text-[11px] text-slate-400">Panca Pilar Tangguh - Anti-Fake GPS System</p>
   </header>
@@ -40,33 +88,41 @@
 
     <!-- 2. Kotak Kamera Live & Watermark Overlay -->
     <div id="liveCameraContainer" class="w-full hidden flex flex-col items-center relative">
-      <div class="w-full rounded-xl overflow-hidden shadow-lg border border-slate-700 bg-black relative">
-        <!-- Elemen Video Live -->
-        <video id="videoElement" autoplay playsinline muted class="w-full h-[540px] object-cover"></video>
+      <div id="cameraViewWrapper" onclick="triggerAutoFocus()" class="w-full rounded-xl overflow-hidden shadow-lg border border-slate-700 bg-black relative mode-portrait cursor-pointer">
         
-        <!-- Tombol Ganti Kamera -->
-        <button onclick="switchCamera()" class="absolute top-3 right-3 bg-slate-900/80 hover:bg-slate-800 text-amber-400 p-2.5 rounded-full shadow-lg backdrop-blur-md transition duration-200 border border-slate-700 flex items-center justify-center z-10" title="Ganti Kamera">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
+        <!-- Elemen Video Live -->
+        <video id="videoElement" autoplay playsinline muted class="w-full h-[78vh] max-h-[820px] object-cover"></video>
+        
+        <!-- Tombol Kontrol -->
+        <div id="liveControlsContainer" onclick="event.stopPropagation()" class="absolute flex gap-2 z-20 transition-all duration-300">
+          <button onclick="switchCamera()" class="bg-slate-900/85 hover:bg-slate-800 text-amber-400 p-2.5 rounded-full shadow-lg backdrop-blur-md border border-slate-700 flex items-center justify-center" title="Ganti Kamera">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button onclick="toggleOrientationMode()" class="bg-slate-900/85 hover:bg-slate-800 text-amber-400 p-2.5 rounded-full shadow-lg backdrop-blur-md border border-slate-700 flex items-center justify-center" title="Ubah Posisi Layout">
+            <svg id="orientationIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
 
         <!-- Live Watermark Overlay -->
-        <div class="absolute bottom-2 left-2 right-2 bg-black/85 backdrop-blur-sm p-2.5 rounded-xl border border-white/15 text-white pointer-events-none z-10 flex gap-2.5 items-center">
-          <img id="liveMapImg" src="" alt="Map" class="w-24 h-24 rounded-lg object-cover border border-white/30 shrink-0 hidden">
+        <div id="liveOverlayBox" class="absolute backdrop-blur-sm p-2 rounded-xl border border-white/15 text-white pointer-events-none z-10 flex gap-2 items-center transition-all duration-300 shadow-xl">
+          <img id="liveMapImg" src="" alt="Map" class="w-12 h-12 rounded-lg object-cover border border-white/30 shrink-0 hidden">
           <div class="flex-1 min-w-0">
-            <div class="text-amber-400 font-bold text-[11px] mb-0.5">📍 GPS MAP Camera Panca Pilar Tangguh</div>
-            <div id="liveAddress" class="text-[9.5px] text-slate-200 leading-tight mb-1 multi-line-address">Memuat alamat lokasi...</div>
-            <div id="liveLatLon" class="text-[10px] text-sky-400 font-mono">Lat: 0.00000, Lon: 0.00000</div>
-            <div id="liveDateTime" class="text-[9px] text-slate-300 mt-0.5">---</div>
+            <div class="text-amber-400 font-bold text-[9px] mb-0.5">📍 GPS MAP Camera</div>
+            <div id="liveAddress" class="text-[7.5px] text-slate-200 leading-tight mb-0.5 multi-line-address">Memuat alamat lokasi...</div>
+            <div id="liveLatLon" class="text-[8px] text-sky-400 font-mono">Lat: 0.00000, Lon: 0.00000</div>
+            <div id="liveDateTime" class="text-[7px] text-slate-300 mt-0.5">---</div>
           </div>
         </div>
 
-        <!-- Logo di Pojok Kiri Atas Live Video -->
-        <!-- Perbaikan Kecerahan Live Logo -->
-        <div class="absolute top-3 left-3 pointer-events-none z-10">
-          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-12 w-auto drop-shadow-md filter brightness-[1.5]">
+        <!-- Logo Container -->
+        <div id="liveLogoContainer" class="absolute pointer-events-none z-10 transition-all duration-300">
+          <img id="liveLogoImg" src="logo.png" alt="Logo" class="h-10 w-auto drop-shadow-md filter brightness-[1.5]">
         </div>
+
       </div>
 
       <!-- Tombol Ambil Gambar -->
@@ -85,7 +141,7 @@
         <img id="geotagPreviewImg" src="" alt="Preview Geotag" class="w-full object-contain">
       </div>
 
-      <!-- Tombol Aksi (Download & Ambil Ulang) -->
+      <!-- Tombol Aksi -->
       <div class="flex w-full gap-3">
         <button onclick="retakePhoto()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2.5 rounded-xl transition duration-200 text-sm border border-slate-700">
           🔄 Ambil Ulang
@@ -96,13 +152,13 @@
       </div>
     </div>
 
-    <!-- Canvas Tersembunyi untuk Render Gambar Akhir -->
+    <!-- Canvas Tersembunyi -->
     <canvas id="cameraCanvas" class="hidden"></canvas>
 
   </main>
 
   <!-- Footer -->
-  <footer class="w-full text-center py-2 text-[11px] text-slate-500">
+  <footer class="w-full text-center py-1 text-[11px] text-slate-500">
     &copy; 2026 Panca Pilar Tangguh. All rights reserved.
   </footer>
 
@@ -113,8 +169,10 @@
     let mapDataUrl = "";
     let finalWatermarkedDataUrl = "";
     let mediaStream = null;
+    let videoTrack = null;
     let serverTimeOffset = 0;
     let currentFacingMode = 'environment';
+    let layoutOrientation = 'portrait';
     const LOGO_URL = "logo.png"; 
 
     document.addEventListener("DOMContentLoaded", async function() {
@@ -140,6 +198,24 @@
 
     function getRealTime() {
       return new Date(new Date().getTime() + serverTimeOffset);
+    }
+
+    function toggleOrientationMode() {
+      layoutOrientation = layoutOrientation === 'portrait' ? 'landscape' : 'portrait';
+      const cameraWrapper = document.getElementById('cameraViewWrapper');
+      const icon = document.getElementById('orientationIcon');
+
+      if (layoutOrientation === 'landscape') {
+        cameraWrapper.classList.remove('mode-portrait');
+        cameraWrapper.classList.add('mode-landscape');
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />';
+        Swal.fire({ toast: true, position: 'top', icon: 'info', title: 'Mode Landscape Aktif', showConfirmButton: false, timer: 1500 });
+      } else {
+        cameraWrapper.classList.remove('mode-landscape');
+        cameraWrapper.classList.add('mode-portrait');
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />';
+        Swal.fire({ toast: true, position: 'top', icon: 'info', title: 'Mode Portrait Aktif', showConfirmButton: false, timer: 1500 });
+      }
     }
 
     function startGpsVerificationProcess() {
@@ -332,12 +408,14 @@
           video: {
             facingMode: { ideal: currentFacingMode },
             width: { ideal: 1280 },
-            height: { ideal: 720 }
+            height: { ideal: 720 },
+            focusMode: { ideal: "continuous" }
           },
           audio: false
         };
 
         mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoTrack = mediaStream.getVideoTracks()[0];
         const videoElement = document.getElementById('videoElement');
         videoElement.srcObject = mediaStream;
         
@@ -352,6 +430,7 @@
         console.error("Gagal membuka kamera:", err);
         try {
           mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          videoTrack = mediaStream.getVideoTracks()[0];
           document.getElementById('videoElement').srcObject = mediaStream;
         } catch (e2) {
           Swal.fire({
@@ -360,6 +439,34 @@
             text: 'Pastikan Anda memberikan izin akses kamera pada browser.'
           });
         }
+      }
+    }
+
+    async function triggerAutoFocus() {
+      if (!videoTrack) return;
+
+      try {
+        const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+        
+        if (capabilities.focusMode && capabilities.focusMode.includes('single-shot')) {
+          await videoTrack.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+          setTimeout(() => {
+            videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(()=>{});
+          }, 1500);
+        } else if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+          await videoTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+        }
+        
+        Swal.fire({
+          toast: true,
+          position: 'top',
+          icon: 'success',
+          title: '🎯 Memfokuskan Kamera...',
+          showConfirmButton: false,
+          timer: 1000
+        });
+      } catch (err) {
+        console.log("Tap-to-focus tidak didukung:", err);
       }
     }
 
@@ -410,116 +517,215 @@
         ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
       }
 
-      const scale = targetWidth / 420;
+      const r = targetWidth / cWidth;
 
       if (LOGO_URL) {
         const logoImg = new Image();
         logoImg.crossOrigin = "anonymous";
         logoImg.onload = () => {
-          
-          const logoPadding = Math.round(5 * scale); 
-          const logoHeight = Math.round(42 * scale);
+          const logoPadding = Math.round(5 * r); 
+          const logoHeight = Math.round(40 * r);
           const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
-          const logoX = Math.round(15 * scale);
-          const logoY = Math.round(15 * scale);
+          
+          ctx.save();
+          if (layoutOrientation === 'landscape') {
+            let logoX = Math.round(15 * r);
+            let logoY = canvas.height - Math.round(15 * r);
+            ctx.translate(logoX, logoY);
+            ctx.rotate(-Math.PI / 2);
 
-          const bgWidth = logoWidth + (2 * logoPadding);
-          const bgHeight = logoHeight + (2 * logoPadding);
-          const bgX = logoX - logoPadding;
-          const bgY = logoY - logoPadding;
-
-          ctx.fillStyle = "rgba(255, 255, 255, 0.6)"; // Putih semi-transparan (60%)
-          if (typeof ctx.roundRect === 'function') {
-            ctx.beginPath();
-            ctx.roundRect(bgX, bgY, bgWidth, bgHeight, Math.round(10 * scale));
-            ctx.fill();
+            const bgWidth = logoWidth + (2 * logoPadding);
+            const bgHeight = logoHeight + (2 * logoPadding);
+            
+            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+            if (typeof ctx.roundRect === 'function') {
+              ctx.beginPath();
+              ctx.roundRect(0, 0, bgWidth, bgHeight, Math.round(8 * r));
+              ctx.fill();
+            } else {
+              ctx.fillRect(0, 0, bgWidth, bgHeight);
+            }
+            ctx.drawImage(logoImg, logoPadding, logoPadding, logoWidth, logoHeight);
           } else {
-            ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+            let logoX = Math.round(12 * r);
+            let logoY = Math.round(12 * r);
+            const bgWidth = logoWidth + (2 * logoPadding);
+            const bgHeight = logoHeight + (2 * logoPadding);
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+            if (typeof ctx.roundRect === 'function') {
+              ctx.beginPath();
+              ctx.roundRect(logoX - logoPadding, logoY - logoPadding, bgWidth, bgHeight, Math.round(8 * r));
+              ctx.fill();
+            } else {
+              ctx.fillRect(logoX - logoPadding, logoY - logoPadding, bgWidth, bgHeight);
+            }
+            ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
           }
+          ctx.restore();
 
-          ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-
-          loadMapAndRenderWatermark(canvas, scale);
+          loadMapAndRenderWatermark(canvas, r);
         };
         logoImg.onerror = () => {
-          loadMapAndRenderWatermark(canvas, scale);
+          loadMapAndRenderWatermark(canvas, r);
         };
         logoImg.src = LOGO_URL;
       } else {
-        loadMapAndRenderWatermark(canvas, scale);
+        loadMapAndRenderWatermark(canvas, r);
       }
     }
 
-    function loadMapAndRenderWatermark(canvas, scale) {
+    function loadMapAndRenderWatermark(canvas, r) {
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
 
-      const boxHeight = Math.round(135 * scale);
-      const boxY = canvas.height - boxHeight - Math.round(10 * scale);
-      const boxX = Math.round(10 * scale);
-      const boxWidth = width - Math.round(20 * scale);
+      if (layoutOrientation === 'landscape') {
+        // Ukuran kotak watermark landscape diperkecil proporsional
+        const boxWidth = Math.round(280 * r);
+        const boxHeight = Math.round(105 * r);
+        
+        ctx.save();
+        const transX = width - Math.round(35 * r);
+        const transY = canvas.height - Math.round(500 * r);
+        ctx.translate(transX, transY);
+        ctx.rotate(-Math.PI / 2);
 
-      ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
-      if (typeof ctx.roundRect === 'function') {
-        ctx.beginPath();
-        ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(12 * scale));
-        ctx.fill();
-      } else {
-        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-      }
-
-      if (mapDataUrl) {
-        const mapImg = new Image();
-        mapImg.onload = () => {
-          const mapSize = Math.round(110 * scale);
-          const mapX = boxX + Math.round(12 * scale);
-          const mapY = boxY + Math.round(12 * scale);
-
-          ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        if (typeof ctx.roundRect === 'function') {
           ctx.beginPath();
-          if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(8 * scale));
-          ctx.clip();
-          ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
+          ctx.roundRect(-boxWidth, -boxHeight, boxWidth, boxHeight, Math.round(10 * r));
+          ctx.fill();
+        } else {
+          ctx.fillRect(-boxWidth, -boxHeight, boxWidth, boxHeight);
+        }
+
+        if (mapDataUrl) {
+          const mapImg = new Image();
+          mapImg.onload = () => {
+            const mapSize = Math.round(85 * r); // Ukuran peta kecil diperkecil
+            const mapX = -boxWidth + Math.round(10 * r);
+            const mapY = -boxHeight + Math.round(10 * r);
+
+            ctx.save();
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r));
+            ctx.clip();
+            ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
+            ctx.restore();
+
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 1.2;
+            if (typeof ctx.roundRect === 'function') {
+              ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r)); ctx.stroke();
+            } else {
+              ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+            }
+
+            drawRotatedWatermarkText(ctx, -boxWidth, -boxHeight, boxWidth, r, mapSize + Math.round(20 * r));
+            ctx.restore();
+          };
+          mapImg.src = mapDataUrl;
+        } else {
+          drawRotatedWatermarkText(ctx, -boxWidth, -boxHeight, boxWidth, r, Math.round(15 * r));
           ctx.restore();
+        }
 
-          ctx.strokeStyle = "#FFFFFF";
-          ctx.lineWidth = 1.5;
-          if (typeof ctx.roundRect === 'function') {
-            ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(8 * scale)); ctx.stroke();
-          } else {
-            ctx.strokeRect(mapX, mapY, mapSize, mapSize);
-          }
-
-          drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, mapSize + Math.round(26 * scale));
-        };
-        mapImg.src = mapDataUrl;
       } else {
-        drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, Math.round(15 * scale));
+        // Mode Portrait: Ukuran kotak watermark diperkecil
+        const boxHeight = Math.round(100 * r);
+        const boxY = canvas.height - boxHeight - Math.round(12 * r);
+        const boxX = Math.round(12 * r);
+        const boxWidth = width - Math.round(24 * r);
+
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(boxX, boxY, boxWidth, boxHeight, Math.round(10 * r));
+          ctx.fill();
+        } else {
+          ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        }
+
+        if (mapDataUrl) {
+          const mapImg = new Image();
+          mapImg.onload = () => {
+            const mapSize = Math.round(76 * r); // Ukuran peta kecil diperkecil
+            const mapX = boxX + Math.round(10 * r);
+            const mapY = boxY + Math.round(10 * r);
+
+            ctx.save();
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r));
+            ctx.clip();
+            ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
+            ctx.restore();
+
+            ctx.strokeStyle = "#FFFFFF";
+            ctx.lineWidth = 1.2;
+            if (typeof ctx.roundRect === 'function') {
+              ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r)); ctx.stroke();
+            } else {
+              ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+            }
+
+            drawWatermarkText(ctx, boxX, boxY, boxWidth, r, mapSize + Math.round(20 * r));
+          };
+          mapImg.src = mapDataUrl;
+        } else {
+          drawWatermarkText(ctx, boxX, boxY, boxWidth, r, Math.round(15 * r));
+        }
       }
     }
 
-    function drawWatermarkText(ctx, boxX, boxY, boxWidth, scale, textOffsetX) {
+    function drawRotatedWatermarkText(ctx, boxX, boxY, boxWidth, r, textOffsetX) {
       const contentX = boxX + textOffsetX;
-      const maxTextWidth = boxWidth - textOffsetX - Math.round(12 * scale);
+      const maxTextWidth = boxWidth - textOffsetX - Math.round(10 * r);
       
+      // Ukuran font dan posisi vertikal disesuaikan lebih kecil & rapat
       ctx.fillStyle = "#F59E0B";
-      ctx.font = "bold " + Math.round(12 * scale) + "px sans-serif";
-      ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(22 * scale));
+      ctx.font = "bold " + Math.round(9 * r) + "px sans-serif";
+      ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(18 * r));
 
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = Math.round(10.5 * scale) + "px sans-serif";
-      wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(38 * scale), maxTextWidth, Math.round(13.5 * scale));
+      ctx.font = Math.round(7.5 * r) + "px sans-serif";
+      wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(30 * r), maxTextWidth, Math.round(10 * r));
 
       ctx.fillStyle = "#38BDF8";
-      ctx.font = "bold " + Math.round(11 * scale) + "px monospace";
-      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(95 * scale));
+      ctx.font = "bold " + Math.round(8 * r) + "px monospace";
+      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(72 * r));
 
       const now = getRealTime();
       const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
       
       ctx.fillStyle = "#CBD5E1";
-      ctx.font = Math.round(10 * scale) + "px sans-serif";
-      ctx.fillText(tanggalStr, contentX, boxY + Math.round(115 * scale));
+      ctx.font = Math.round(7.5 * r) + "px sans-serif";
+      ctx.fillText(tanggalStr, contentX, boxY + Math.round(88 * r));
+
+      finalizeCanvasImage();
+    }
+
+    function drawWatermarkText(ctx, boxX, boxY, boxWidth, r, textOffsetX) {
+      const contentX = boxX + textOffsetX;
+      const maxTextWidth = boxWidth - textOffsetX - Math.round(10 * r);
+      
+      ctx.fillStyle = "#F59E0B";
+      ctx.font = "bold " + Math.round(9 * r) + "px sans-serif";
+      ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(18 * r));
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = Math.round(7.5 * r) + "px sans-serif";
+      wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(30 * r), maxTextWidth, Math.round(10 * r));
+
+      ctx.fillStyle = "#38BDF8";
+      ctx.font = "bold " + Math.round(8 * r) + "px monospace";
+      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(72 * r));
+
+      const now = getRealTime();
+      const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
+      
+      ctx.fillStyle = "#CBD5E1";
+      ctx.font = Math.round(7.5 * r) + "px sans-serif";
+      ctx.fillText(tanggalStr, contentX, boxY + Math.round(88 * r));
 
       finalizeCanvasImage();
     }
