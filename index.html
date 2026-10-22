@@ -182,6 +182,14 @@
     let layoutOrientation = 'portrait';
     const LOGO_URL = "logo.png"; 
 
+    // Variabel Global Preloaded Aset untuk Kinerja Ringan
+    let cachedLogoImg = new Image();
+    cachedLogoImg.crossOrigin = "anonymous";
+    cachedLogoImg.src = LOGO_URL;
+
+    let cachedMapImg = new Image();
+    cachedMapImg.crossOrigin = "anonymous";
+
     // Variabel Rekaman Video
     let currentMode = 'photo'; // 'photo' atau 'video'
     let mediaRecorder = null;
@@ -346,6 +354,7 @@
 
       generateSatelliteMapDataUrl(latestSample.lat, latestSample.lon).then(dataUrl => {
         mapDataUrl = dataUrl;
+        cachedMapImg.src = mapDataUrl; // Simpan ke cache global untuk video/foto ringan
         const mapEl = document.getElementById('liveMapImg');
         if (mapEl && mapDataUrl) {
           mapEl.src = mapDataUrl;
@@ -446,11 +455,11 @@
         const constraints = {
           video: {
             facingMode: { ideal: currentFacingMode },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 1280 },  // Resolusi 720p HD (Ringan dan jernih untuk mobile)
+            height: { ideal: 720 },
             focusMode: { ideal: "continuous" }
           },
-          audio: true // Diaktifkan agar rekaman video memiliki audio
+          audio: true
         };
 
         mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -553,7 +562,7 @@
         sy = (vHeight - sHeight) / 2;
       }
 
-      const targetWidth = 1920;
+      const targetWidth = 1280;
       const targetHeight = Math.round(targetWidth / cRatio);
 
       canvas.width = targetWidth;
@@ -570,64 +579,11 @@
       }
 
       const r = targetWidth / cWidth;
-
-      if (LOGO_URL) {
-        const logoImg = new Image();
-        logoImg.crossOrigin = "anonymous";
-        logoImg.onload = () => {
-          const logoPadding = Math.round(5 * r); 
-          const logoHeight = Math.round(40 * r);
-          const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
-          
-          ctx.save();
-          if (layoutOrientation === 'landscape') {
-            let logoX = Math.round(15 * r);
-            let logoY = canvas.height - Math.round(15 * r);
-            ctx.translate(logoX, logoY);
-            ctx.rotate(-Math.PI / 2);
-
-            const bgWidth = logoWidth + (2 * logoPadding);
-            const bgHeight = logoHeight + (2 * logoPadding);
-            
-            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-            if (typeof ctx.roundRect === 'function') {
-              ctx.beginPath();
-              ctx.roundRect(0, 0, bgWidth, bgHeight, Math.round(8 * r));
-              ctx.fill();
-            } else {
-              ctx.fillRect(0, 0, bgWidth, bgHeight);
-            }
-            ctx.drawImage(logoImg, logoPadding, logoPadding, logoWidth, logoHeight);
-          } else {
-            let logoX = Math.round(12 * r);
-            let logoY = Math.round(12 * r);
-            const bgWidth = logoWidth + (2 * logoPadding);
-            const bgHeight = logoHeight + (2 * logoPadding);
-
-            ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-            if (typeof ctx.roundRect === 'function') {
-              ctx.beginPath();
-              ctx.roundRect(logoX - logoPadding, logoY - logoPadding, bgWidth, bgHeight, Math.round(8 * r));
-              ctx.fill();
-            } else {
-              ctx.fillRect(logoX - logoPadding, logoY - logoPadding, bgWidth, bgHeight);
-            }
-            ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
-          }
-          ctx.restore();
-
-          loadMapAndRenderWatermark(canvas, r, 'photo');
-        };
-        logoImg.onerror = () => {
-          loadMapAndRenderWatermark(canvas, r, 'photo');
-        };
-        logoImg.src = LOGO_URL;
-      } else {
-        loadMapAndRenderWatermark(canvas, r, 'photo');
-      }
+      renderWatermarkOnCanvas(ctx, targetWidth, targetHeight, r, cachedLogoImg, cachedMapImg);
+      finalizeCanvasImage();
     }
 
-    // --- REKAM VIDEO DENGAN WATERMARK BIKINAN CANVAS ---
+    // --- REKAM VIDEO SUPER RINGAN & LANCAR (OPTIMIZED 25 FPS) ---
     function startVideoRecording() {
       const videoElement = document.getElementById('videoElement');
       const canvas = document.getElementById('cameraCanvas');
@@ -635,21 +591,13 @@
 
       const cWidth = videoElement.clientWidth;
       const cHeight = videoElement.clientHeight;
-      const targetWidth = 1280; // Resolusi stabil untuk video
+      const targetWidth = 1280; // Resolusi stabil HD 720p
       const targetHeight = Math.round(targetWidth / (cWidth / cHeight));
 
       canvas.width = targetWidth;
       canvas.height = targetHeight;
       const ctx = canvas.getContext('2d');
       const r = targetWidth / cWidth;
-
-      const logoImg = new Image();
-      logoImg.crossOrigin = "anonymous";
-      logoImg.src = LOGO_URL;
-
-      const mapImg = new Image();
-      mapImg.crossOrigin = "anonymous";
-      if (mapDataUrl) mapImg.src = mapDataUrl;
 
       isRecording = true;
       recordingSeconds = 0;
@@ -663,8 +611,9 @@
         document.getElementById('mainActionText').innerText = `⏹️ Stop Rekam (${min}:${sec})`;
       }, 1000);
 
-      // Loop render frame canvas untuk video
+      // Menggunakan 25 FPS (40ms interval) agar sangat ringan dan bebas patah-patah di HP
       renderInterval = setInterval(() => {
+        if (!isRecording) return;
         const vWidth = videoElement.videoWidth;
         const vHeight = videoElement.videoHeight;
         const vRatio = vWidth / vHeight;
@@ -692,13 +641,12 @@
           ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
         }
 
-        // Render Logo & Watermark ke Canvas Frame
-        renderWatermarkOnCanvas(ctx, targetWidth, targetHeight, r, logoImg, mapImg);
-      }, 30); // ~33 fps
+        // Render Watermark menggunakan aset cache global (Tanpa lag)
+        renderWatermarkOnCanvas(ctx, targetWidth, targetHeight, r, cachedLogoImg, cachedMapImg);
+      }, 40); 
 
-      canvasStream = canvas.captureStream(30);
+      canvasStream = canvas.captureStream(25); // 25 FPS Stream
       
-      // Gabungkan audio track dari mediaStream jika ada
       const audioTracks = mediaStream.getAudioTracks();
       if (audioTracks.length > 0) {
         canvasStream.addTrack(audioTracks[0]);
@@ -710,7 +658,7 @@
         options = { mimeType: 'video/webm' };
       }
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = {}; // Default browser
+        options = {}; 
       }
 
       try {
@@ -883,28 +831,6 @@
         } else {
           drawWatermarkTextContent(ctx, boxX, boxY, boxWidth, r, Math.round(15 * r));
         }
-      }
-    }
-
-    function loadMapAndRenderWatermark(canvas, r, mode) {
-      const ctx = canvas.getContext('2d');
-      const width = canvas.width;
-      const height = canvas.height;
-
-      const mapImg = new Image();
-      mapImg.crossOrigin = "anonymous";
-      mapImg.onload = () => {
-        renderWatermarkOnCanvas(ctx, width, height, r, null, mapImg);
-        finalizeCanvasImage();
-      };
-      mapImg.onerror = () => {
-        renderWatermarkOnCanvas(ctx, width, height, r, null, null);
-        finalizeCanvasImage();
-      };
-      if (mapDataUrl) mapImg.src = mapDataUrl;
-      else {
-        renderWatermarkOnCanvas(ctx, width, height, r, null, null);
-        finalizeCanvasImage();
       }
     }
 
