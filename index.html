@@ -61,7 +61,7 @@
       right: 35px;
       left: auto;
       top: auto;
-      width: 250px; /* Diperkecil agar lebih kompak */
+      width: 250px;
       transform: rotate(-90deg);
       transform-origin: bottom right;
       background-color: rgba(0, 0, 0, 0.5);
@@ -88,10 +88,17 @@
 
     <!-- 2. Kotak Kamera Live & Watermark Overlay -->
     <div id="liveCameraContainer" class="w-full hidden flex flex-col items-center relative">
+      
+      <!-- Pilihan Mode: Foto / Video -->
+      <div class="w-full flex bg-slate-950 p-1 rounded-xl mb-2 border border-slate-800">
+        <button id="modePhotoBtn" onclick="switchCameraMode('photo')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-amber-500 text-slate-950 transition duration-200">📷 Mode Foto</button>
+        <button id="modeVideoBtn" onclick="switchCameraMode('video')" class="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition duration-200">🎥 Mode Video</button>
+      </div>
+
       <div id="cameraViewWrapper" onclick="triggerAutoFocus()" class="w-full rounded-xl overflow-hidden shadow-lg border border-slate-700 bg-black relative mode-portrait cursor-pointer">
         
         <!-- Elemen Video Live -->
-        <video id="videoElement" autoplay playsinline muted class="w-full h-[78vh] max-h-[820px] object-cover"></video>
+        <video id="videoElement" autoplay playsinline muted class="w-full h-[74vh] max-h-[800px] object-cover"></video>
         
         <!-- Tombol Kontrol -->
         <div id="liveControlsContainer" onclick="event.stopPropagation()" class="absolute flex gap-2 z-20 transition-all duration-300">
@@ -125,29 +132,29 @@
 
       </div>
 
-      <!-- Tombol Ambil Gambar -->
-      <button onclick="captureLivePhoto()" class="w-full mt-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition duration-200 text-sm">
+      <!-- Tombol Aksi Utama (Ambil Foto / Rekam Video) -->
+      <button id="mainActionButton" onclick="handleMainAction()" class="w-full mt-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition duration-200 text-sm">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
-        Ambil Gambar
+        <span id="mainActionText">Ambil Gambar</span>
       </button>
     </div>
 
-    <!-- 3. Kotak Preview Hasil Foto -->
+    <!-- 3. Kotak Preview Hasil Foto / Video -->
     <div id="previewContainer" class="w-full hidden flex flex-col items-center">
-      <div class="w-full rounded-xl overflow-hidden shadow-lg border border-slate-700 mb-3 bg-slate-950">
-        <img id="geotagPreviewImg" src="" alt="Preview Geotag" class="w-full object-contain">
+      <div id="previewMediaWrapper" class="w-full rounded-xl overflow-hidden shadow-lg border border-slate-700 mb-3 bg-slate-950 flex justify-center">
+        <!-- Dinamis diisi img atau video -->
       </div>
 
       <!-- Tombol Aksi -->
       <div class="flex w-full gap-3">
-        <button onclick="retakePhoto()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2.5 rounded-xl transition duration-200 text-sm border border-slate-700">
+        <button onclick="retakeMedia()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2.5 rounded-xl transition duration-200 text-sm border border-slate-700">
           🔄 Ambil Ulang
         </button>
-        <a id="downloadBtn" download="Geotag_Photo.jpg" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-center transition duration-200 text-sm flex items-center justify-center gap-1 shadow-lg">
-          💾 Download Foto
+        <a id="downloadBtn" download="Geotag_Media.jpg" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-center transition duration-200 text-sm flex items-center justify-center gap-1 shadow-lg">
+          💾 Download File
         </a>
       </div>
     </div>
@@ -167,13 +174,23 @@
     let currentUserGps = { lat: 0, lon: 0 };
     let resolvedAddressText = "Memuat alamat lokasi...";
     let mapDataUrl = "";
-    let finalWatermarkedDataUrl = "";
+    let finalMediaDataUrl = "";
     let mediaStream = null;
     let videoTrack = null;
     let serverTimeOffset = 0;
     let currentFacingMode = 'environment';
     let layoutOrientation = 'portrait';
     const LOGO_URL = "logo.png"; 
+
+    // Variabel Rekaman Video
+    let currentMode = 'photo'; // 'photo' atau 'video'
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+    let recordingTimer = null;
+    let recordingSeconds = 0;
+    let canvasStream = null;
+    let renderInterval = null;
 
     document.addEventListener("DOMContentLoaded", async function() {
       await syncServerTime();
@@ -200,7 +217,29 @@
       return new Date(new Date().getTime() + serverTimeOffset);
     }
 
+    function switchCameraMode(mode) {
+      if (isRecording) return;
+      currentMode = mode;
+      const photoBtn = document.getElementById('modePhotoBtn');
+      const videoBtn = document.getElementById('modeVideoBtn');
+      const actionText = document.getElementById('mainActionText');
+      const actionBtn = document.getElementById('mainActionButton');
+
+      if (mode === 'photo') {
+        photoBtn.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg bg-amber-500 text-slate-950 transition duration-200";
+        videoBtn.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition duration-200";
+        actionText.innerText = "Ambil Gambar";
+        actionBtn.className = "w-full mt-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition duration-200 text-sm";
+      } else {
+        videoBtn.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white transition duration-200";
+        photoBtn.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition duration-200";
+        actionText.innerText = "🔴 Mulai Rekam Video";
+        actionBtn.className = "w-full mt-3 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 transition duration-200 text-sm";
+      }
+    }
+
     function toggleOrientationMode() {
+      if (isRecording) return;
       layoutOrientation = layoutOrientation === 'portrait' ? 'landscape' : 'portrait';
       const cameraWrapper = document.getElementById('cameraViewWrapper');
       const icon = document.getElementById('orientationIcon');
@@ -404,7 +443,6 @@
           mediaStream.getTracks().forEach(track => track.stop());
         }
 
-        // Ditingkatkan ke resolusi ideal Full HD (1920x1080) agar kamera jauh lebih tajam dan jernih
         const constraints = {
           video: {
             facingMode: { ideal: currentFacingMode },
@@ -412,7 +450,7 @@
             height: { ideal: 1080 },
             focusMode: { ideal: "continuous" }
           },
-          audio: false
+          audio: true // Diaktifkan agar rekaman video memiliki audio
         };
 
         mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -430,14 +468,14 @@
       } catch (err) {
         console.error("Gagal membuka kamera:", err);
         try {
-          mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           videoTrack = mediaStream.getVideoTracks()[0];
           document.getElementById('videoElement').srcObject = mediaStream;
         } catch (e2) {
           Swal.fire({
             icon: 'error',
-            title: 'Gagal Akses Kamera',
-            text: 'Pastikan Anda memberikan izin akses kamera pada browser.'
+            title: 'Gagal Akses Kamera/Audio',
+            text: 'Pastikan Anda memberikan izin akses kamera dan mikrofon pada browser.'
           });
         }
       }
@@ -472,8 +510,21 @@
     }
 
     function switchCamera() {
+      if (isRecording) return;
       currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
       startLiveCameraStream();
+    }
+
+    function handleMainAction() {
+      if (currentMode === 'photo') {
+        captureLivePhoto();
+      } else {
+        if (!isRecording) {
+          startVideoRecording();
+        } else {
+          stopVideoRecording();
+        }
+      }
     }
 
     function captureLivePhoto() {
@@ -502,7 +553,6 @@
         sy = (vHeight - sHeight) / 2;
       }
 
-      // Target resolusi canvas ditingkatkan ke 1920 (Full HD) agar foto hasil unduhan sangat tajam dan tidak pecah
       const targetWidth = 1920;
       const targetHeight = Math.round(targetWidth / cRatio);
 
@@ -566,28 +616,196 @@
           }
           ctx.restore();
 
-          loadMapAndRenderWatermark(canvas, r);
+          loadMapAndRenderWatermark(canvas, r, 'photo');
         };
         logoImg.onerror = () => {
-          loadMapAndRenderWatermark(canvas, r);
+          loadMapAndRenderWatermark(canvas, r, 'photo');
         };
         logoImg.src = LOGO_URL;
       } else {
-        loadMapAndRenderWatermark(canvas, r);
+        loadMapAndRenderWatermark(canvas, r, 'photo');
       }
     }
 
-    function loadMapAndRenderWatermark(canvas, r) {
-      const ctx = canvas.getContext('2d');
-      const width = canvas.width;
+    // --- REKAM VIDEO DENGAN WATERMARK BIKINAN CANVAS ---
+    function startVideoRecording() {
+      const videoElement = document.getElementById('videoElement');
+      const canvas = document.getElementById('cameraCanvas');
+      if (!videoElement || !canvas) return;
 
+      const cWidth = videoElement.clientWidth;
+      const cHeight = videoElement.clientHeight;
+      const targetWidth = 1280; // Resolusi stabil untuk video
+      const targetHeight = Math.round(targetWidth / (cWidth / cHeight));
+
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      const r = targetWidth / cWidth;
+
+      const logoImg = new Image();
+      logoImg.crossOrigin = "anonymous";
+      logoImg.src = LOGO_URL;
+
+      const mapImg = new Image();
+      mapImg.crossOrigin = "anonymous";
+      if (mapDataUrl) mapImg.src = mapDataUrl;
+
+      isRecording = true;
+      recordingSeconds = 0;
+      const actionBtn = document.getElementById('mainActionButton');
+      actionBtn.className = "w-full mt-3 bg-red-800 text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 animate-pulse transition duration-200 text-sm";
+      
+      recordingTimer = setInterval(() => {
+        recordingSeconds++;
+        let min = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+        let sec = String(recordingSeconds % 60).padStart(2, '0');
+        document.getElementById('mainActionText').innerText = `⏹️ Stop Rekam (${min}:${sec})`;
+      }, 1000);
+
+      // Loop render frame canvas untuk video
+      renderInterval = setInterval(() => {
+        const vWidth = videoElement.videoWidth;
+        const vHeight = videoElement.videoHeight;
+        const vRatio = vWidth / vHeight;
+        const cRatio = cWidth / cHeight;
+
+        let sWidth, sHeight, sx, sy;
+        if (vRatio > cRatio) {
+          sHeight = vHeight;
+          sWidth = vHeight * cRatio;
+          sx = (vWidth - sWidth) / 2;
+          sy = 0;
+        } else {
+          sWidth = vWidth;
+          sHeight = vWidth / cRatio;
+          sx = 0;
+          sy = (vHeight - sHeight) / 2;
+        }
+
+        if (currentFacingMode === 'user') {
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, -targetWidth, 0, targetWidth, targetHeight);
+          ctx.restore();
+        } else {
+          ctx.drawImage(videoElement, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+        }
+
+        // Render Logo & Watermark ke Canvas Frame
+        renderWatermarkOnCanvas(ctx, targetWidth, targetHeight, r, logoImg, mapImg);
+      }, 30); // ~33 fps
+
+      canvasStream = canvas.captureStream(30);
+      
+      // Gabungkan audio track dari mediaStream jika ada
+      const audioTracks = mediaStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        canvasStream.addTrack(audioTracks[0]);
+      }
+
+      recordedChunks = [];
+      let options = { mimeType: 'video/webm;codecs=vp9' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = { mimeType: 'video/webm' };
+      }
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = {}; // Default browser
+      }
+
+      try {
+        mediaRecorder = new MediaRecorder(canvasStream, options);
+      } catch (e) {
+        mediaRecorder = new MediaRecorder(canvasStream);
+      }
+
+      mediaRecorder.ondataavailable = event => {
+        if (event.data && event.data.size > 0) {
+          recordedChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        finalMediaDataUrl = URL.createObjectURL(blob);
+
+        const previewWrapper = document.getElementById('previewMediaWrapper');
+        previewWrapper.innerHTML = `<video src="${finalMediaDataUrl}" controls autoplay playsinline class="w-full object-contain max-h-[75vh]"></video>`;
+        document.getElementById('downloadBtn').href = finalMediaDataUrl;
+        document.getElementById('downloadBtn').download = "Geotag_Video.webm";
+
+        document.getElementById('liveCameraContainer').classList.add('hidden');
+        document.getElementById('previewContainer').classList.remove('hidden');
+      };
+
+      mediaRecorder.start();
+    }
+
+    function stopVideoRecording() {
+      isRecording = false;
+      clearInterval(recordingTimer);
+      clearInterval(renderInterval);
+
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+
+      switchCameraMode('video');
+    }
+
+    function renderWatermarkOnCanvas(ctx, width, height, r, logoImg, mapImg) {
+      // 1. Render Logo
+      if (logoImg && logoImg.complete && logoImg.naturalWidth !== 0) {
+        const logoPadding = Math.round(5 * r); 
+        const logoHeight = Math.round(40 * r);
+        const logoWidth = Math.round(logoHeight * (logoImg.width / logoImg.height));
+        
+        ctx.save();
+        if (layoutOrientation === 'landscape') {
+          let logoX = Math.round(15 * r);
+          let logoY = height - Math.round(15 * r);
+          ctx.translate(logoX, logoY);
+          ctx.rotate(-Math.PI / 2);
+
+          const bgWidth = logoWidth + (2 * logoPadding);
+          const bgHeight = logoHeight + (2 * logoPadding);
+          
+          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(0, 0, bgWidth, bgHeight, Math.round(8 * r));
+            ctx.fill();
+          } else {
+            ctx.fillRect(0, 0, bgWidth, bgHeight);
+          }
+          ctx.drawImage(logoImg, logoPadding, logoPadding, logoWidth, logoHeight);
+        } else {
+          let logoX = Math.round(12 * r);
+          let logoY = Math.round(12 * r);
+          const bgWidth = logoWidth + (2 * logoPadding);
+          const bgHeight = logoHeight + (2 * logoPadding);
+
+          ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath();
+            ctx.roundRect(logoX - logoPadding, logoY - logoPadding, bgWidth, bgHeight, Math.round(8 * r));
+            ctx.fill();
+          } else {
+            ctx.fillRect(logoX - logoPadding, logoY - logoPadding, bgWidth, bgHeight);
+          }
+          ctx.drawImage(logoImg, logoX, logoY, logoWidth, logoHeight);
+        }
+        ctx.restore();
+      }
+
+      // 2. Render Watermark Box Bawah/Samping
       if (layoutOrientation === 'landscape') {
         const boxWidth = Math.round(280 * r);
         const boxHeight = Math.round(105 * r);
         
         ctx.save();
         const transX = width - Math.round(35 * r);
-        const transY = canvas.height - Math.round(500 * r);
+        const transY = height - Math.round(500 * r);
         ctx.translate(transX, transY);
         ctx.rotate(-Math.PI / 2);
 
@@ -600,40 +818,35 @@
           ctx.fillRect(-boxWidth, -boxHeight, boxWidth, boxHeight);
         }
 
-        if (mapDataUrl) {
-          const mapImg = new Image();
-          mapImg.onload = () => {
-            const mapSize = Math.round(85 * r);
-            const mapX = -boxWidth + Math.round(10 * r);
-            const mapY = -boxHeight + Math.round(10 * r);
+        if (mapImg && mapImg.complete && mapImg.naturalWidth !== 0) {
+          const mapSize = Math.round(85 * r);
+          const mapX = -boxWidth + Math.round(10 * r);
+          const mapY = -boxHeight + Math.round(10 * r);
 
-            ctx.save();
-            ctx.beginPath();
-            if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r));
-            ctx.clip();
-            ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
-            ctx.restore();
-
-            ctx.strokeStyle = "#FFFFFF";
-            ctx.lineWidth = 1.2;
-            if (typeof ctx.roundRect === 'function') {
-              ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r)); ctx.stroke();
-            } else {
-              ctx.strokeRect(mapX, mapY, mapSize, mapSize);
-            }
-
-            drawRotatedWatermarkText(ctx, -boxWidth, -boxHeight, boxWidth, r, mapSize + Math.round(20 * r));
-            ctx.restore();
-          };
-          mapImg.src = mapDataUrl;
-        } else {
-          drawRotatedWatermarkText(ctx, -boxWidth, -boxHeight, boxWidth, r, Math.round(15 * r));
+          ctx.save();
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r));
+          ctx.clip();
+          ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
           ctx.restore();
+
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 1.2;
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r)); ctx.stroke();
+          } else {
+            ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+          }
+
+          drawWatermarkTextContent(ctx, -boxWidth, -boxHeight, boxWidth, r, mapSize + Math.round(20 * r));
+        } else {
+          drawWatermarkTextContent(ctx, -boxWidth, -boxHeight, boxWidth, r, Math.round(15 * r));
         }
+        ctx.restore();
 
       } else {
         const boxHeight = Math.round(100 * r);
-        const boxY = canvas.height - boxHeight - Math.round(12 * r);
+        const boxY = height - boxHeight - Math.round(12 * r);
         const boxX = Math.round(12 * r);
         const boxWidth = width - Math.round(24 * r);
 
@@ -646,64 +859,56 @@
           ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
         }
 
-        if (mapDataUrl) {
-          const mapImg = new Image();
-          mapImg.onload = () => {
-            const mapSize = Math.round(76 * r);
-            const mapX = boxX + Math.round(10 * r);
-            const mapY = boxY + Math.round(10 * r);
+        if (mapImg && mapImg.complete && mapImg.naturalWidth !== 0) {
+          const mapSize = Math.round(76 * r);
+          const mapX = boxX + Math.round(10 * r);
+          const mapY = boxY + Math.round(10 * r);
 
-            ctx.save();
-            ctx.beginPath();
-            if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r));
-            ctx.clip();
-            ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
-            ctx.restore();
+          ctx.save();
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r));
+          ctx.clip();
+          ctx.drawImage(mapImg, mapX, mapY, mapSize, mapSize);
+          ctx.restore();
 
-            ctx.strokeStyle = "#FFFFFF";
-            ctx.lineWidth = 1.2;
-            if (typeof ctx.roundRect === 'function') {
-              ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r)); ctx.stroke();
-            } else {
-              ctx.strokeRect(mapX, mapY, mapSize, mapSize);
-            }
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 1.2;
+          if (typeof ctx.roundRect === 'function') {
+            ctx.beginPath(); ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(6 * r)); ctx.stroke();
+          } else {
+            ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+          }
 
-            drawWatermarkText(ctx, boxX, boxY, boxWidth, r, mapSize + Math.round(20 * r));
-          };
-          mapImg.src = mapDataUrl;
+          drawWatermarkTextContent(ctx, boxX, boxY, boxWidth, r, mapSize + Math.round(20 * r));
         } else {
-          drawWatermarkText(ctx, boxX, boxY, boxWidth, r, Math.round(15 * r));
+          drawWatermarkTextContent(ctx, boxX, boxY, boxWidth, r, Math.round(15 * r));
         }
       }
     }
 
-    function drawRotatedWatermarkText(ctx, boxX, boxY, boxWidth, r, textOffsetX) {
-      const contentX = boxX + textOffsetX;
-      const maxTextWidth = boxWidth - textOffsetX - Math.round(10 * r);
-      
-      ctx.fillStyle = "#F59E0B";
-      ctx.font = "bold " + Math.round(9 * r) + "px sans-serif";
-      ctx.fillText("📍 GPS MAP Camera Panca Pilar Tangguh", contentX, boxY + Math.round(18 * r));
+    function loadMapAndRenderWatermark(canvas, r, mode) {
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
 
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = Math.round(7.5 * r) + "px sans-serif";
-      wrapTextThreeLines(ctx, resolvedAddressText, contentX, boxY + Math.round(30 * r), maxTextWidth, Math.round(10 * r));
-
-      ctx.fillStyle = "#38BDF8";
-      ctx.font = "bold " + Math.round(8 * r) + "px monospace";
-      ctx.fillText(`Lat ${currentUserGps.lat.toFixed(6)} Long ${currentUserGps.lon.toFixed(6)}`, contentX, boxY + Math.round(72 * r));
-
-      const now = getRealTime();
-      const tanggalStr = now.toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) + " " + now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour12: false }) + " GMT +07:00";
-      
-      ctx.fillStyle = "#CBD5E1";
-      ctx.font = Math.round(7.5 * r) + "px sans-serif";
-      ctx.fillText(tanggalStr, contentX, boxY + Math.round(88 * r));
-
-      finalizeCanvasImage();
+      const mapImg = new Image();
+      mapImg.crossOrigin = "anonymous";
+      mapImg.onload = () => {
+        renderWatermarkOnCanvas(ctx, width, height, r, null, mapImg);
+        finalizeCanvasImage();
+      };
+      mapImg.onerror = () => {
+        renderWatermarkOnCanvas(ctx, width, height, r, null, null);
+        finalizeCanvasImage();
+      };
+      if (mapDataUrl) mapImg.src = mapDataUrl;
+      else {
+        renderWatermarkOnCanvas(ctx, width, height, r, null, null);
+        finalizeCanvasImage();
+      }
     }
 
-    function drawWatermarkText(ctx, boxX, boxY, boxWidth, r, textOffsetX) {
+    function drawWatermarkTextContent(ctx, boxX, boxY, boxWidth, r, textOffsetX) {
       const contentX = boxX + textOffsetX;
       const maxTextWidth = boxWidth - textOffsetX - Math.round(10 * r);
       
@@ -725,8 +930,6 @@
       ctx.fillStyle = "#CBD5E1";
       ctx.font = Math.round(7.5 * r) + "px sans-serif";
       ctx.fillText(tanggalStr, contentX, boxY + Math.round(88 * r));
-
-      finalizeCanvasImage();
     }
 
     function wrapTextThreeLines(context, text, x, y, maxWidth, lineHeight) {
@@ -759,21 +962,22 @@
 
     function finalizeCanvasImage() {
       const canvas = document.getElementById('cameraCanvas');
-      // Kualitas kompresi ditingkatkan menjadi 0.95 (95%) untuk hasil gambar yang sangat jernih
-      finalWatermarkedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      finalMediaDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
       if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
       }
 
-      document.getElementById('geotagPreviewImg').src = finalWatermarkedDataUrl;
-      document.getElementById('downloadBtn').href = finalWatermarkedDataUrl;
+      const previewWrapper = document.getElementById('previewMediaWrapper');
+      previewWrapper.innerHTML = `<img src="${finalMediaDataUrl}" alt="Preview Geotag" class="w-full object-contain">`;
+      document.getElementById('downloadBtn').href = finalMediaDataUrl;
+      document.getElementById('downloadBtn').download = "Geotag_Photo.jpg";
 
       document.getElementById('liveCameraContainer').classList.add('hidden');
       document.getElementById('previewContainer').classList.remove('hidden');
     }
 
-    function retakePhoto() {
+    function retakeMedia() {
       document.getElementById('previewContainer').classList.add('hidden');
       document.getElementById('liveCameraContainer').classList.remove('hidden');
       startLiveCameraStream();
